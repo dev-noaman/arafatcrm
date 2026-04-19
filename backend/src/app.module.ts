@@ -8,6 +8,8 @@ import { AuthModule } from "./auth/auth.module";
 import { ClientsModule } from "./clients/clients.module";
 import { BrokersModule } from "./brokers/brokers.module";
 import { DealsModule } from "./deals/deals.module";
+import { DashboardModule } from "./dashboard/dashboard.module";
+import { ReportsModule } from "./reports/reports.module";
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { DealsModule } from "./deals/deals.module";
     ClientsModule,
     BrokersModule,
     DealsModule,
+    DashboardModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
