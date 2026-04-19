@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "baseUrl": ".",
+    "paths": { "@arafat/shared": ["../packages/shared/src"] }
+  },
+  "include": ["src/**/*", "test/**/*", "seed/**/*", "data-source.ts"]
+}
