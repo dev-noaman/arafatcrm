@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: arafatcrm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-arafat}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-arafat_secret}
+      POSTGRES_DB: ${DB_NAME:-arafatcrm}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-arafat} -d ${DB_NAME:-arafatcrm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: arafatcrm-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${DB_USER:-arafat}:${DB_PASSWORD:-arafat_secret}@db:5432/${DB_NAME:-arafatcrm}
+      JWT_SECRET: ${JWT_SECRET:-changeme_in_production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

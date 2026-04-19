@@ -9,9 +9,9 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
-    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./data-source.ts",
-    "migration:run": "typeorm-ts-node-commonjs migration:run -d ./data-source.ts",
-    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./data-source.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d ./typeorm.config.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d ./typeorm.config.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d ./typeorm.config.ts",
     "seed": "ts-node seed/seed.js"
   },
   "dependencies": {
