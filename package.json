@@ -1,0 +1,19 @@
+{
+  "name": "arafat-crm",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./backend --filter ./frontend run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm --filter backend test",
+    "test:e2e": "pnpm --filter backend test:e2e",
+    "seed": "pnpm --filter backend seed",
+    "migration:run": "pnpm --filter backend migration:run",
+    "migration:generate": "pnpm --filter backend migration:generate"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4"
+  }
+}
