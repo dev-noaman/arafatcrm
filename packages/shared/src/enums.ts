@@ -13,7 +13,15 @@ export const ClientSource = {
 } as const;
 export type ClientSource = (typeof ClientSource)[keyof typeof ClientSource];
 
+export const DealStatus = {
+  ACTIVE: "active",
+  WON: "won",
+  LOST: "lost",
+} as const;
+export type DealStatus = (typeof DealStatus)[keyof typeof DealStatus];
+
 export const DealStage = {
+  LEAD: "lead",
   NEW: "NEW",
   QUALIFIED: "QUALIFIED",
   MEETING: "MEETING",
@@ -28,6 +36,7 @@ export type DealStage = (typeof DealStage)[keyof typeof DealStage];
 export const TERMINAL_STAGES: DealStage[] = [DealStage.WON, DealStage.LOST];
 
 export const PIPELINE_STAGES: DealStage[] = [
+  DealStage.LEAD,
   DealStage.NEW,
   DealStage.QUALIFIED,
   DealStage.MEETING,

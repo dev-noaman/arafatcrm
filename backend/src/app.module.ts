@@ -7,6 +7,7 @@ import { UsersModule } from "./users/users.module";
 import { AuthModule } from "./auth/auth.module";
 import { ClientsModule } from "./clients/clients.module";
 import { BrokersModule } from "./brokers/brokers.module";
+import { DealsModule } from "./deals/deals.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { BrokersModule } from "./brokers/brokers.module";
     AuthModule,
     ClientsModule,
     BrokersModule,
+    DealsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
