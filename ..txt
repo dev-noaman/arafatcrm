@@ -1,0 +1,162 @@
+Here’s a clean, ready-to-use **AI design/dev prompt** for your CRM:
+
+---
+
+**PROMPT:**
+
+Build a modern **Sales CRM Web App (ArafatCRM)** for a business center that rents office spaces and workstations.
+
+### 🎨 Design
+
+* Primary color: **#2563EB (Royal Blue)**
+* Style: clean, modern, minimal (SaaS dashboard style)
+* Use soft shadows, rounded cards, and clear typography
+* Responsive (desktop-first)
+
+---
+
+### 🧩 Core Features
+
+#### 1. Sales Pipeline (Kanban Board)
+
+Stages:
+
+* New
+
+* Qualified
+
+* Meeting
+
+* Proposal
+
+* Negotiation
+
+* Contract
+
+* Drag & drop deals between stages
+
+* Each card shows:
+
+  * Client Name
+  * Company Name
+  * Expected Value (QAR)
+  * Expected Close Date
+  * Location (Barwa Alsadd / Element Westbay / Marina50 Lusail)
+  * Space Type (Workstation / Office)
+
+---
+
+#### 2. Deals (Opportunities)
+
+Fields:
+
+* Client Name (linked)
+* Payment Terms
+* Currency (default QAR)
+* Expected Value
+* Expected Close Date
+* Stage (pipeline)
+* Location
+* Space Type
+* Broker (optional)
+
+---
+
+#### 3. Clients
+
+Fields:
+
+* Name
+* Phone
+* Email
+* Company Name
+* Source (dropdown):
+
+  * Facebook
+  * Instagram
+  * TikTok
+  * Broker
+  * Google
+
+---
+
+#### 4. Brokers
+
+Fields:
+
+* Name
+* Phone
+* Company
+* Contract Validity (from/to)
+
+---
+
+#### 5. Dashboard
+
+Show:
+
+* Total Deals
+* Won Deals
+* Lost Deals
+* Revenue (QAR)
+* Conversion Rate
+
+---
+
+#### 6. Reports
+
+* Win vs Lost deals
+* Filters:
+
+  * Date range
+  * Location
+  * Broker
+
+---
+
+### ⚙️ Tech Stack
+
+* Backend: **NestJS**
+* Frontend: **React + Tailwind (TailAdmin Pro)**
+* Use REST APIs
+* Use clean modular architecture
+
+---
+
+### 📱 Pages
+
+* Dashboard
+* Pipeline (Kanban)
+* Deals List
+* Deal Details (Edit + Submit)
+* Clients
+* Brokers
+
+---
+
+### 🧠 Behavior
+
+* Dragging a deal updates its stage
+* “Won” and “Lost” are final statuses
+* All values in **QAR**
+* Clean forms with validation
+* Fast and simple UX (no complexity)
+
+---
+
+### 🏢 Business Context
+
+Arafat Business Center rents:
+
+* Workstations
+* Office Spaces
+
+Locations:
+
+* Barwa Alsadd
+* Element Westbay
+* Marina50 Lusail
+
+---
+
+Build it as a scalable, production-ready CRM with clean UI and strong UX focused on sales tracking and deal conversion.
