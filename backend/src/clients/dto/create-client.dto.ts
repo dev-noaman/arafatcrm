@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString } from "class-validator";
 import { ClientSource } from "@arafat/shared";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -6,12 +6,12 @@ export class CreateClientDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiProperty()
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiPropertyOptional()
   @IsString()

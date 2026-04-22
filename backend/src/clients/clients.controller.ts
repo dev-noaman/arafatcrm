@@ -8,18 +8,15 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
-  UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { ClientsService } from "./clients.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
-import { JwtGuard } from "../common/guards";
 
 @ApiTags("Clients")
 @ApiBearerAuth()
-@UseGuards(JwtGuard)
 @Controller("clients")
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
@@ -28,6 +25,12 @@ export class ClientsController {
   @ApiOperation({ summary: "Create a new client" })
   create(@Body() dto: CreateClientDto) {
     return this.clientsService.create(dto);
+  }
+
+  @Post("bulk")
+  @ApiOperation({ summary: "Bulk create clients" })
+  bulkCreate(@Body() dtos: CreateClientDto[]) {
+    return this.clientsService.bulkCreate(dtos);
   }
 
   @Get()

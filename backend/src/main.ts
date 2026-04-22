@@ -26,7 +26,7 @@ async function bootstrap() {
   const doc = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, doc);
 
-  const port = Number(process.env.BACKEND_PORT ?? 3000);
+  const port = Number(process.env.BACKEND_PORT ?? 3001);
   await app.listen(port);
   // eslint-disable-next-line no-console
   console.log(`Backend listening on :${port} (docs at /api/docs)`);

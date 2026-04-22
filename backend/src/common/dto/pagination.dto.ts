@@ -1,6 +1,7 @@
-import { IsInt, IsOptional, Max, Min } from "class-validator";
+import { IsInt, IsOptional, Max, Min, IsEnum } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { DealStatus, DealStage } from "@arafat/shared";
 
 export class PaginationQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -17,4 +18,14 @@ export class PaginationQueryDto {
   @Max(100)
   @IsOptional()
   limit: number = 20;
+
+  @ApiPropertyOptional({ enum: DealStatus })
+  @IsEnum(DealStatus)
+  @IsOptional()
+  status?: DealStatus;
+
+  @ApiPropertyOptional({ enum: DealStage })
+  @IsEnum(DealStage)
+  @IsOptional()
+  stage?: DealStage;
 }

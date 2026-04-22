@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || "/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -8,6 +8,8 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+export default apiClient;
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -26,8 +28,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("accessToken");
-      window.location.href = "/auth/login";
+      const url = error.config?.url || "";
+      const isAuthEndpoint = url.startsWith("/auth/");
+      if (!isAuthEndpoint) {
+        localStorage.removeItem("accessToken");
+        window.location.href = "/auth/login";
+      }
     }
     return Promise.reject(error);
   },

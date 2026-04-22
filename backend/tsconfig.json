@@ -6,9 +6,9 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": ".",
     "baseUrl": ".",
-    "paths": { "@arafat/shared": ["../packages/shared/src"] }
+    "paths": { "@arafat/shared": ["../packages/shared/dist"] }
   },
   "include": ["src/**/*", "test/**/*", "seed/**/*", "data-source.ts"]
 }

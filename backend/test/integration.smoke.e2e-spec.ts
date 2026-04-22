@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
-import * as request from "supertest";
-import { AppModule } from "./../src/app.module";
+import request from "supertest";
+import { AppModule } from "../src/app.module";
 import { DataSource } from "typeorm";
 
 describe("Backend Integration Smoke Tests (e2e)", () => {
@@ -9,11 +9,14 @@ describe("Backend Integration Smoke Tests (e2e)", () => {
   let dataSource: DataSource;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = "test-secret-key-for-testing";
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );
@@ -33,7 +36,9 @@ describe("Backend Integration Smoke Tests (e2e)", () => {
 
   describe("Health Check", () => {
     it("/health (GET) - should return ok", () => {
-      return request(app.getHttpServer()).get("/health").expect(200).expect("ok");
+      return request(app.getHttpServer()).get("/api/v1/health").expect(200).expect((res) => {
+        expect(res.body.status).toBe("ok");
+      });
     });
   });
 
@@ -101,7 +106,7 @@ describe("Backend Integration Smoke Tests (e2e)", () => {
           name: "Smoke Test Client",
           email: `smoke_client_${Date.now()}@example.com`,
           phone: "+974 5555 0000",
-          source: "REFERRAL",
+          source: "BROKER",
         })
         .expect(201)
         .expect((res) => {
@@ -169,8 +174,9 @@ describe("Backend Integration Smoke Tests (e2e)", () => {
         .set("Authorization", `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body.totalClients).toBeDefined();
           expect(res.body.totalDeals).toBeDefined();
+          expect(res.body.wonDeals).toBeDefined();
+          expect(res.body.conversionRate).toBeDefined();
         });
     });
 

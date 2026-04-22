@@ -1,10 +1,10 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import * as bcrypt from "bcrypt";
+import * as bcrypt from "bcryptjs";
 import { User } from "../users/user.entity";
-import { LoginDto, RegisterDto } from "./dto/auth.dto";
+import { LoginDto, RegisterDto, UpdateProfileDto } from "./dto/auth.dto";
 
 @Injectable()
 export class AuthService {
@@ -64,10 +64,34 @@ export class AuthService {
       email: dto.email,
       password: hashedPassword,
       name: dto.name,
-      role: "user",
+      role: "SALES",
     });
 
     await this.usersRepo.save(user);
     return this.login(user);
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    return { id: user.id, email: user.email, name: user.name, role: user.role };
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.usersRepo.findOne({ where: { id: userId }, select: ["id", "email", "password", "name", "role"] });
+    if (!user) throw new UnauthorizedException();
+
+    if (dto.newPassword) {
+      if (!dto.currentPassword) throw new BadRequestException("Current password is required to set a new password");
+      const match = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!match) throw new BadRequestException("Current password is incorrect");
+      (user as any).password = await bcrypt.hash(dto.newPassword, 10);
+    }
+
+    if (dto.name !== undefined) user.name = dto.name;
+    if (dto.email !== undefined) user.email = dto.email;
+
+    await this.usersRepo.save(user);
+    return { id: user.id, email: user.email, name: user.name, role: user.role };
   }
 }

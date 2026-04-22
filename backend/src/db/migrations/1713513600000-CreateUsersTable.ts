@@ -30,10 +30,10 @@ export class CreateUsersTable1713513600000 implements MigrationInterface {
           {
             name: "role",
             type: "varchar",
-            default: "'user'",
+            default: "'SALES'",
           },
           {
-            name: "is_active",
+            name: "isActive",
             type: "boolean",
             default: true,
           },

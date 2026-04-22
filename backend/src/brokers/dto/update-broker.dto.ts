@@ -1,5 +1,5 @@
 import { PartialType, OmitType, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString } from "class-validator";
+import { IsOptional, IsString, IsBoolean } from "class-validator";
 import { CreateBrokerDto } from "./create-broker.dto";
 
 export class UpdateBrokerDto extends PartialType(
@@ -9,4 +9,9 @@ export class UpdateBrokerDto extends PartialType(
   @IsString()
   @IsOptional()
   managedById?: string;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

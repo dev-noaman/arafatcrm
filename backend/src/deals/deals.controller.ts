@@ -8,20 +8,21 @@ import {
   Param,
   Query,
   ParseUUIDPipe,
-  UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { DealsService } from "./deals.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
+import { MarkLostDto } from "./dto/mark-lost.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
-import { JwtGuard } from "../common/guards";
+
 import { User } from "../common/decorators";
 
 @ApiTags("Deals")
 @ApiBearerAuth()
-@UseGuards(JwtGuard)
 @Controller("deals")
 export class DealsController {
   constructor(private readonly dealsService: DealsService) {}
@@ -29,17 +30,13 @@ export class DealsController {
   @Post()
   @ApiOperation({ summary: "Create a new deal" })
   create(@Body() dto: CreateDealDto, @User() user: any) {
-    return this.dealsService.create(dto, user.id);
+    return this.dealsService.create(dto, user.id, user.role);
   }
 
   @Get()
   @ApiOperation({ summary: "List all deals with pagination and filters" })
-  findAll(
-    @Query() pagination: PaginationQueryDto,
-    @Query("status") status?: string,
-    @Query("stage") stage?: string,
-  ) {
-    return this.dealsService.findAll(pagination, { status, stage });
+  findAll(@Query() pagination: PaginationQueryDto) {
+    return this.dealsService.findAll(pagination, { status: pagination.status, stage: pagination.stage });
   }
 
   @Get(":id")
@@ -56,12 +53,13 @@ export class DealsController {
 
   @Post(":id/mark-lost")
   @ApiOperation({ summary: "Mark deal as lost" })
+  @HttpCode(HttpStatus.OK)
   markAsLost(
     @Param("id", ParseUUIDPipe) id: string,
-    @Body("reason") reason: string,
+    @Body() dto: MarkLostDto,
     @User() user: any,
   ) {
-    return this.dealsService.markAsLost(id, reason, user.id, user.role);
+    return this.dealsService.markAsLost(id, dto.reason, user.id, user.role);
   }
 
   @Delete(":id")

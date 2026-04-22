@@ -14,14 +14,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-  setUser: (user) =>
+  setUser: (user) => {
+    console.log("[auth-store] setUser called with:", user);
     set({
       user,
       isAuthenticated: !!user,
       isLoading: false,
-    }),
+    });
+    console.log("[auth-store] State after setUser:", { user, isAuthenticated: !!user });
+  },
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => {
+    console.log("[auth-store] logout called");
     localStorage.removeItem("accessToken");
     set({
       user: null,

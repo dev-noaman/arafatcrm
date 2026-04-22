@@ -1,21 +1,22 @@
+import { Exclude } from "class-transformer";
 import { Column, Entity } from "typeorm";
 import { BaseEntity } from "../common/entities/base.entity";
-import { Role } from "@arafat/shared";
 
 @Entity("users")
 export class User extends BaseEntity {
   @Column({ unique: true })
-  email: string;
+  email: string = "";
 
+  @Exclude()
   @Column()
-  password: string;
+  password: string = "";
 
-  @Column({ default: Role.USER })
-  role: Role;
+  @Column({ type: "varchar", enum: ["ADMIN", "SALES"], default: "SALES" })
+  role: string = "SALES";
 
-  @Column({ nullable: true })
-  name: string;
+  @Column({ nullable: true, type: "varchar" })
+  name: string | null = null;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
 }

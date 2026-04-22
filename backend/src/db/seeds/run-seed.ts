@@ -1,5 +1,5 @@
-import { dataSource } from "../../typeorm.config";
-import { seed } from "./seeds/seed";
+import { dataSource } from "../../../typeorm.config";
+import { seed } from "./seed";
 
 (async () => {
   try {

@@ -1,11 +1,11 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { ReportsService } from "./reports.service";
-import { JwtGuard } from "../common/guards";
+import { Roles } from "../common/decorators/roles.decorator";
+import { Role } from "@arafat/shared";
 
 @ApiTags("Reports")
 @ApiBearerAuth()
-@UseGuards(JwtGuard)
 @Controller("reports")
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
@@ -24,7 +24,20 @@ export class ReportsController {
 
   @Get("broker-performance")
   @ApiOperation({ summary: "Get broker performance report" })
-  getBrokerPerformance() {
-    return this.reportsService.getBrokerPerformance();
+  getBrokerPerformance(@Query("month") month?: string) {
+    return this.reportsService.getBrokerPerformance(month);
+  }
+
+  @Get("space-type-breakdown")
+  @ApiOperation({ summary: "Get deal breakdown by space type" })
+  getSpaceTypeBreakdown(@Query("month") month?: string) {
+    return this.reportsService.getSpaceTypeBreakdown(month);
+  }
+
+  @Get("staff-performance")
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "Get monthly staff performance report (admin only)" })
+  getStaffPerformance(@Query("month") month?: string) {
+    return this.reportsService.getStaffPerformance(month);
   }
 }

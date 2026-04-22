@@ -26,15 +26,23 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      console.log("[LoginPage] Attempting login with:", { email: data.email });
       const response = await authApi.login(data);
+      console.log("[LoginPage] Login response:", response);
       localStorage.setItem("accessToken", response.accessToken);
       setUser(response.user);
+      console.log("[LoginPage] User set in auth store:", response.user);
       navigate("/dashboard");
     } catch (err: any) {
+      console.error("[LoginPage] Login error:", err);
       setError(err.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const quickLogin = async (email: string, password: string) => {
+    await onSubmit({ email, password });
   };
 
   return (
@@ -81,9 +89,26 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Demo credentials: admin@arafatcrm.com / password123
-        </p>
+        {/* Quick Login Buttons */}
+        <div className="mt-6 border-t border-gray-200 pt-5">
+          <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">Quick Demo Login</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => quickLogin("admin@arafatcrm.com", "password123")}
+              disabled={isLoading}
+              className="flex-1 rounded-lg border-2 border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50"
+            >
+              Admin
+            </button>
+            <button
+              onClick={() => quickLogin("sales1@arafatcrm.com", "password123")}
+              disabled={isLoading}
+              className="flex-1 rounded-lg border-2 border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50"
+            >
+              Sales
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

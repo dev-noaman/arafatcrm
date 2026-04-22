@@ -1,6 +1,7 @@
 import { PartialType, OmitType, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsString, IsOptional, IsNumber, Min, Max } from "class-validator";
+import { IsString, IsOptional, IsNumber, IsBoolean, Min, Max, IsEnum } from "class-validator";
 import { CreateDealDto } from "./create-deal.dto";
+import { DealStage } from "@arafat/shared";
 
 export class UpdateDealDto extends PartialType(
   OmitType(CreateDealDto, ["clientId", "brokerId", "ownerId"] as const),
@@ -20,10 +21,10 @@ export class UpdateDealDto extends PartialType(
   @IsOptional()
   ownerId?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({ enum: DealStage })
+  @IsEnum(DealStage)
   @IsOptional()
-  stage?: string;
+  stage?: DealStage;
 
   @ApiPropertyOptional()
   @IsBoolean()
@@ -34,4 +35,9 @@ export class UpdateDealDto extends PartialType(
   @IsString()
   @IsOptional()
   lossReason?: string;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  confirmTerminal?: boolean;
 }

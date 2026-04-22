@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
-import * as request from "supertest";
-import { AppModule } from "./../src/app.module";
+import request from "supertest";
+import { AppModule } from "../../src/app.module";
 import { DataSource } from "typeorm";
 
 describe("Auth (e2e)", () => {
@@ -9,11 +9,14 @@ describe("Auth (e2e)", () => {
   let dataSource: DataSource;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = "test-secret-key-for-testing";
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );
@@ -38,7 +41,7 @@ describe("Auth (e2e)", () => {
           name: "Test User",
         })
         .expect(201)
-        .expect((res) => {
+        .expect((res: any) => {
           expect(res.body.accessToken).toBeDefined();
           expect(res.body.user.email).toContain("test_");
         });
@@ -72,7 +75,7 @@ describe("Auth (e2e)", () => {
         .post("/api/v1/auth/login")
         .send({ email: testEmail, password: "password123" })
         .expect(200)
-        .expect((res) => {
+        .expect((res: any) => {
           expect(res.body.accessToken).toBeDefined();
         });
     });

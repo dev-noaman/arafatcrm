@@ -15,23 +15,23 @@ export class CreateDealDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @ApiProperty()
   @IsNumber()
   @Min(0)
   @IsNotEmpty()
-  value: number;
+  value!: number;
 
   @ApiProperty({ enum: DealLocation })
   @IsEnum(DealLocation)
   @IsNotEmpty()
-  location: DealLocation;
+  location!: DealLocation;
 
   @ApiProperty({ enum: DealSpaceType })
   @IsEnum(DealSpaceType)
   @IsNotEmpty()
-  spaceType: DealSpaceType;
+  spaceType!: DealSpaceType;
 
   @ApiPropertyOptional({ enum: Currency })
   @IsEnum(Currency)
@@ -48,6 +48,11 @@ export class CreateDealDto {
   @IsOptional()
   propertyAddress?: string;
 
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
   @ApiPropertyOptional({ minimum: 0, maximum: 100 })
   @IsNumber()
   @Min(0)
@@ -63,7 +68,7 @@ export class CreateDealDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  clientId: string;
+  clientId!: string;
 
   @ApiPropertyOptional()
   @IsString()

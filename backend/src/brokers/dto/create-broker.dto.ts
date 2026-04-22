@@ -1,16 +1,16 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsDateString } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class CreateBrokerDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiProperty()
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiPropertyOptional()
   @IsString()
@@ -22,12 +22,20 @@ export class CreateBrokerDto {
   @IsOptional()
   company?: string;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 100 })
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  @IsOptional()
-  commissionRate?: number;
+  @ApiProperty({ enum: ["PERSONAL", "CORPORATE"] })
+  @IsString()
+  @IsNotEmpty()
+  brokerType!: string;
+
+  @ApiProperty()
+  @IsDateString()
+  @IsNotEmpty()
+  contractFrom!: string;
+
+  @ApiProperty()
+  @IsDateString()
+  @IsNotEmpty()
+  contractTo!: string;
 
   @ApiPropertyOptional()
   @IsString()

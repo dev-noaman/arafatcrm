@@ -32,22 +32,23 @@ export class DashboardService {
       })
       .getMany();
 
-    const totalRevenue = wonDeals.reduce((sum, deal) => sum + (deal.commissionAmount || 0), 0);
-
-    const activeValue = await this.dealsRepo
+    const lostDeals = await this.dealsRepo
       .createQueryBuilder("deal")
-      .where("deal.status = :status", { status: "active" })
-      .andWhere("deal.isLost = :isLost", { isLost: false })
-      .getMany()
-      .then((deals) => deals.reduce((sum, deal) => sum + deal.value, 0));
+      .where('deal.status = :status OR deal.stage = :stage', {
+        status: "lost",
+        stage: "LOST",
+      })
+      .getMany();
+
+    const totalRevenue = wonDeals.reduce((sum, deal) => sum + Number(deal.commissionAmount || 0), 0);
+    const conversionRate = totalDeals > 0 ? (wonDeals.length / totalDeals) * 100 : 0;
 
     return {
-      totalClients,
-      totalBrokers,
       totalDeals,
-      activeDeals,
-      totalRevenue,
-      activeValue,
+      wonDeals: wonDeals.length,
+      lostDeals: lostDeals.length,
+      revenueQar: totalRevenue.toFixed(2),
+      conversionRate: Math.round(conversionRate * 100) / 100,
     };
   }
 
@@ -69,14 +70,22 @@ export class DashboardService {
       .orderBy("deal.createdAt", "ASC")
       .getMany();
 
-    // Group by date
-    const byDate = new Map<string, number>();
+    // Group by date (bucket)
+    const byDate = new Map<string, { revenue: number; count: number }>();
     for (const deal of deals) {
       const date = deal.createdAt.toISOString().split("T")[0];
-      byDate.set(date, (byDate.get(date) || 0) + (deal.commissionAmount || 0));
+      const existing = byDate.get(date) || { revenue: 0, count: 0 };
+      byDate.set(date, {
+        revenue: existing.revenue + Number(deal.commissionAmount || 0),
+        count: existing.count + 1,
+      });
     }
 
-    return Array.from(byDate.entries()).map(([date, revenue]) => ({ date, revenue }));
+    return Array.from(byDate.entries()).map(([bucket, data]) => ({
+      bucket,
+      revenueQar: data.revenue.toFixed(2),
+      wonCount: data.count,
+    }));
   }
 
   async getByLocation(): Promise<ByLocationReportDto[]> {
@@ -84,15 +93,16 @@ export class DashboardService {
       .createQueryBuilder("deal")
       .select("deal.location", "location")
       .addSelect("COUNT(deal.id)", "count")
-      .addSelect("SUM(deal.value)", "totalValue")
-      .where("deal.isLost = :isLost", { isLost: false })
+      .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
+      .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
+      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
       .groupBy("deal.location")
       .getRawMany();
 
     return deals.map((d) => ({
       location: d.location,
-      count: parseInt(d.count, 10),
-      totalValue: parseFloat(d.totalValue) || 0,
+      won: parseInt(d.wonCount, 10) || 0,
+      lost: parseInt(d.lostCount, 10) || 0,
     }));
   }
 
@@ -102,15 +112,16 @@ export class DashboardService {
       .innerJoin("deal.client", "client")
       .select("client.source", "source")
       .addSelect("COUNT(deal.id)", "count")
-      .addSelect("SUM(deal.value)", "totalValue")
-      .where("deal.isLost = :isLost", { isLost: false })
+      .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
+      .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
+      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
       .groupBy("client.source")
       .getRawMany();
 
     return deals.map((d) => ({
       source: d.source,
-      count: parseInt(d.count, 10),
-      totalValue: parseFloat(d.totalValue) || 0,
+      won: parseInt(d.wonCount, 10) || 0,
+      lost: parseInt(d.lostCount, 10) || 0,
     }));
   }
 }

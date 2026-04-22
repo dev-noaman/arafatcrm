@@ -1,10 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
-import * as request from "supertest";
-import { AppModule } from "./../src/app.module";
+import request from "supertest";
+import { AppModule } from "../../src/app.module";
 import { DataSource } from "typeorm";
-import * as bcrypt from "bcrypt";
-import { User } from "../src/users/user.entity";
+import * as bcrypt from "bcryptjs";
+import { User } from "../../src/users/user.entity";
 
 describe("Users (e2e)", () => {
   let app: INestApplication;
@@ -13,11 +13,14 @@ describe("Users (e2e)", () => {
   let testUserId: string;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = "test-secret-key-for-testing";
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );

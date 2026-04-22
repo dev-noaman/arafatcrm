@@ -1,4 +1,2 @@
-/* tailwindcss */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tai Admin Design System */
+@import "./tailadmin.css";

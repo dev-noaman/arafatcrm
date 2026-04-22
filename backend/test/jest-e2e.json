@@ -4,6 +4,18 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": ["ts-jest", {
+      "tsconfig": {
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "baseUrl": "..",
+        "paths": { "@arafat/shared": ["../../packages/shared/dist"] }
+      },
+      "isolatedModules": true
+    }]
+  },
+  "moduleNameMapper": {
+    "@arafat/shared$": "<rootDir>/../../packages/shared/dist/index.js"
   }
 }

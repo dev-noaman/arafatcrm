@@ -17,13 +17,26 @@ export class ClientsService {
     try {
       const client = this.clientsRepo.create(dto);
       return await this.clientsRepo.save(client);
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === "23505") {
-        // Unique violation
         throw new ConflictException("Client with this email already exists");
       }
       throw error;
     }
+  }
+
+  async bulkCreate(dtos: CreateClientDto[]) {
+    const results = { created: 0, errors: [] as { row: number; message: string }[] };
+    for (let i = 0; i < dtos.length; i++) {
+      try {
+        const client = this.clientsRepo.create(dtos[i]);
+        await this.clientsRepo.save(client);
+        results.created++;
+      } catch (error: any) {
+        results.errors.push({ row: i + 1, message: error.code === "23505" ? "Email already exists" : error.message });
+      }
+    }
+    return results;
   }
 
   async findAll(pagination: PaginationQueryDto) {
@@ -57,7 +70,7 @@ export class ClientsService {
 
     try {
       return await this.clientsRepo.save(client);
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === "23505") {
         throw new ConflictException("Client with this email already exists");
       }

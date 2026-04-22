@@ -101,7 +101,7 @@ export class CreateDealsTable1713513900000 implements MigrationInterface {
           {
             name: "stage_history",
             type: "varchar",
-            array: true,
+            isArray: true,
             default: "'{}'",
           },
           {
