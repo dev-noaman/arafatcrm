@@ -46,7 +46,12 @@ export class DealsService {
     }
   }
 
-  async findAll(pagination: PaginationQueryDto, filters?: { status?: string; stage?: string }) {
+  async findAll(
+    pagination: PaginationQueryDto,
+    filters?: { status?: string; stage?: string },
+    userId?: string,
+    userRole?: string,
+  ) {
     const { page, limit } = pagination;
     const where: any = {};
 
@@ -55,6 +60,11 @@ export class DealsService {
     }
     if (filters?.stage) {
       where.stage = filters.stage;
+    }
+
+    // SALES users see only their own deals
+    if (userRole === "SALES" && userId) {
+      where.owner = { id: userId };
     }
 
     const [data, total] = await this.dealsRepo.findAndCount({
@@ -68,7 +78,7 @@ export class DealsService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, userRole?: string) {
     const deal = await this.dealsRepo.findOne({
       where: { id },
       relations: ["client", "broker", "owner"],
@@ -78,11 +88,16 @@ export class DealsService {
       throw new NotFoundException(`Deal with ID ${id} not found`);
     }
 
+    // SALES users can only see their own deals (return 404 to not leak existence)
+    if (userRole === "SALES" && userId && deal.owner?.id !== userId) {
+      throw new NotFoundException(`Deal with ID ${id} not found`);
+    }
+
     return deal;
   }
 
   async update(id: string, dto: UpdateDealDto, userId: string, userRole: string) {
-    const deal = await this.findOne(id);
+    const deal = await this.findOne(id, userId, userRole);
 
     // Check ownership or admin role
     if (deal.owner.id !== userId && userRole !== "ADMIN") {
@@ -140,7 +155,7 @@ export class DealsService {
   }
 
   async markAsLost(id: string, reason: string, userId: string, userRole: string) {
-    const deal = await this.findOne(id);
+    const deal = await this.findOne(id, userId, userRole);
 
     if (deal.owner.id !== userId && userRole !== "ADMIN") {
       throw new ForbiddenException("Only deal owner or admin can mark as lost");
@@ -154,7 +169,7 @@ export class DealsService {
   }
 
   async remove(id: string, userId: string, userRole: string) {
-    const deal = await this.findOne(id);
+    const deal = await this.findOne(id, userId, userRole);
 
     if (deal.owner.id !== userId && userRole !== "ADMIN") {
       throw new ForbiddenException("Only deal owner or admin can delete");
@@ -166,17 +181,25 @@ export class DealsService {
     }
   }
 
-  async findByClient(clientId: string) {
+  async findByClient(clientId: string, userId?: string, userRole?: string) {
+    const where: any = { client: { id: clientId } };
+    if (userRole === "SALES" && userId) {
+      where.owner = { id: userId };
+    }
     return this.dealsRepo.find({
-      where: { client: { id: clientId } },
+      where,
       relations: ["client", "broker", "owner"],
       order: { createdAt: "DESC" },
     });
   }
 
-  async findByBroker(brokerId: string) {
+  async findByBroker(brokerId: string, userId?: string, userRole?: string) {
+    const where: any = { broker: { id: brokerId } };
+    if (userRole === "SALES" && userId) {
+      where.owner = { id: userId };
+    }
     return this.dealsRepo.find({
-      where: { broker: { id: brokerId } },
+      where,
       relations: ["client", "broker", "owner"],
       order: { createdAt: "DESC" },
     });

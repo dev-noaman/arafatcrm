@@ -19,7 +19,8 @@ import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MarkLostDto } from "./dto/mark-lost.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 
-import { User } from "../common/decorators";
+import { User, Roles } from "../common/decorators";
+import { Role } from "@arafat/shared";
 
 @ApiTags("Deals")
 @ApiBearerAuth()
@@ -35,14 +36,14 @@ export class DealsController {
 
   @Get()
   @ApiOperation({ summary: "List all deals with pagination and filters" })
-  findAll(@Query() pagination: PaginationQueryDto) {
-    return this.dealsService.findAll(pagination, { status: pagination.status, stage: pagination.stage });
+  findAll(@Query() pagination: PaginationQueryDto, @User() user: any) {
+    return this.dealsService.findAll(pagination, { status: pagination.status, stage: pagination.stage }, user.id, user.role);
   }
 
   @Get(":id")
   @ApiOperation({ summary: "Get deal by ID" })
-  findOne(@Param("id", ParseUUIDPipe) id: string) {
-    return this.dealsService.findOne(id);
+  findOne(@Param("id", ParseUUIDPipe) id: string, @User() user: any) {
+    return this.dealsService.findOne(id, user.id, user.role);
   }
 
   @Put(":id")
@@ -70,17 +71,18 @@ export class DealsController {
 
   @Get("client/:clientId")
   @ApiOperation({ summary: "Find deals by client" })
-  findByClient(@Param("clientId", ParseUUIDPipe) clientId: string) {
-    return this.dealsService.findByClient(clientId);
+  findByClient(@Param("clientId", ParseUUIDPipe) clientId: string, @User() user: any) {
+    return this.dealsService.findByClient(clientId, user.id, user.role);
   }
 
   @Get("broker/:brokerId")
   @ApiOperation({ summary: "Find deals by broker" })
-  findByBroker(@Param("brokerId", ParseUUIDPipe) brokerId: string) {
-    return this.dealsService.findByBroker(brokerId);
+  findByBroker(@Param("brokerId", ParseUUIDPipe) brokerId: string, @User() user: any) {
+    return this.dealsService.findByBroker(brokerId, user.id, user.role);
   }
 
   @Get("owner/:ownerId")
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Find deals by owner" })
   findByOwner(
     @Param("ownerId", ParseUUIDPipe) ownerId: string,
