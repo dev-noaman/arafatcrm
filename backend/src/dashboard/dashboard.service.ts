@@ -1,44 +1,43 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Between } from "typeorm";
+import { Repository } from "typeorm";
 import { Deal } from "../deals/deal.entity";
-import { Client } from "../clients/client.entity";
-import { Broker } from "../brokers/broker.entity";
-import { User } from "../users/user.entity";
 import { DashboardStatsDto, RevenueTimeseriesPointDto, ByLocationReportDto, BySourceReportDto } from "@arafat/shared";
 
 @Injectable()
 export class DashboardService {
   constructor(
     @InjectRepository(Deal) private dealsRepo: Repository<Deal>,
-    @InjectRepository(Client) private clientsRepo: Repository<Client>,
-    @InjectRepository(Broker) private brokersRepo: Repository<Broker>,
-    @InjectRepository(User) private usersRepo: Repository<User>,
   ) {}
 
-  async getStats(): Promise<DashboardStatsDto> {
-    const [totalClients, totalBrokers, totalDeals, activeDeals] = await Promise.all([
-      this.clientsRepo.count(),
-      this.brokersRepo.count(),
-      this.dealsRepo.count(),
-      this.dealsRepo.count({ where: { status: "active", isLost: false } }),
-    ]);
+  async getStats(userId?: string, userRole?: string): Promise<DashboardStatsDto> {
+    const isSales = userRole === "SALES" && userId;
 
-    const wonDeals = await this.dealsRepo
+    const totalDeals = isSales
+      ? await this.dealsRepo.count({ where: { owner: { id: userId } } })
+      : await this.dealsRepo.count();
+
+    const wonQb = this.dealsRepo
       .createQueryBuilder("deal")
       .where('deal.status = :status OR deal.stage = :stage', {
         status: "won",
         stage: "WON",
-      })
-      .getMany();
+      });
+    if (isSales) {
+      wonQb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+    const wonDeals = await wonQb.getMany();
 
-    const lostDeals = await this.dealsRepo
+    const lostQb = this.dealsRepo
       .createQueryBuilder("deal")
       .where('deal.status = :status OR deal.stage = :stage', {
         status: "lost",
         stage: "LOST",
-      })
-      .getMany();
+      });
+    if (isSales) {
+      lostQb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+    const lostDeals = await lostQb.getMany();
 
     const totalRevenue = wonDeals.reduce((sum, deal) => sum + Number(deal.commissionAmount || 0), 0);
     const conversionRate = totalDeals > 0 ? (wonDeals.length / totalDeals) * 100 : 0;
@@ -52,12 +51,12 @@ export class DashboardService {
     };
   }
 
-  async getRevenueTimeseries(days: number = 30): Promise<RevenueTimeseriesPointDto[]> {
+  async getRevenueTimeseries(days: number = 30, userId?: string, userRole?: string): Promise<RevenueTimeseriesPointDto[]> {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const deals = await this.dealsRepo
+    const qb = this.dealsRepo
       .createQueryBuilder("deal")
       .where("deal.createdAt BETWEEN :start AND :end", {
         start: startDate,
@@ -66,9 +65,13 @@ export class DashboardService {
       .andWhere("(deal.status = :status OR deal.stage = :stage)", {
         status: "won",
         stage: "WON",
-      })
-      .orderBy("deal.createdAt", "ASC")
-      .getMany();
+      });
+
+    if (userRole === "SALES" && userId) {
+      qb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+
+    const deals = await qb.orderBy("deal.createdAt", "ASC").getMany();
 
     // Group by date (bucket)
     const byDate = new Map<string, { revenue: number; count: number }>();
@@ -88,16 +91,20 @@ export class DashboardService {
     }));
   }
 
-  async getByLocation(): Promise<ByLocationReportDto[]> {
-    const deals = await this.dealsRepo
+  async getByLocation(userId?: string, userRole?: string): Promise<ByLocationReportDto[]> {
+    const qb = this.dealsRepo
       .createQueryBuilder("deal")
       .select("deal.location", "location")
       .addSelect("COUNT(deal.id)", "count")
       .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
       .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
-      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
-      .groupBy("deal.location")
-      .getRawMany();
+      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" });
+
+    if (userRole === "SALES" && userId) {
+      qb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+
+    const deals = await qb.groupBy("deal.location").getRawMany();
 
     return deals.map((d) => ({
       location: d.location,
@@ -106,17 +113,21 @@ export class DashboardService {
     }));
   }
 
-  async getBySource(): Promise<BySourceReportDto[]> {
-    const deals = await this.dealsRepo
+  async getBySource(userId?: string, userRole?: string): Promise<BySourceReportDto[]> {
+    const qb = this.dealsRepo
       .createQueryBuilder("deal")
       .innerJoin("deal.client", "client")
       .select("client.source", "source")
       .addSelect("COUNT(deal.id)", "count")
       .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
       .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
-      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
-      .groupBy("client.source")
-      .getRawMany();
+      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" });
+
+    if (userRole === "SALES" && userId) {
+      qb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+
+    const deals = await qb.groupBy("client.source").getRawMany();
 
     return deals.map((d) => ({
       source: d.source,
