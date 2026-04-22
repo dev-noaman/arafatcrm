@@ -19,6 +19,8 @@ import { BrokersService } from "./brokers.service";
 import { CreateBrokerDto } from "./dto/create-broker.dto";
 import { UpdateBrokerDto } from "./dto/update-broker.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
+import { Roles } from "../common/decorators/roles.decorator";
+import { Role } from "@arafat/shared";
 import { brokerDocStorage, documentFileFilter, DOC_UPLOAD_LIMITS } from "./broker-upload.helper";
 
 @ApiTags("Brokers")
@@ -52,18 +54,21 @@ export class BrokersController {
   }
 
   @Put(":id")
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Update broker" })
   update(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateBrokerDto) {
     return this.brokersService.update(id, dto);
   }
 
   @Delete(":id")
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Delete broker" })
   remove(@Param("id", ParseUUIDPipe) id: string) {
     return this.brokersService.remove(id);
   }
 
   @Post(":id/documents")
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Upload a document for a broker" })
   @ApiConsumes("multipart/form-data")
   @ApiBody({
@@ -93,6 +98,7 @@ export class BrokersController {
   }
 
   @Delete(":id/documents/:documentId")
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Delete a broker document" })
   async removeDocument(
     @Param("id", ParseUUIDPipe) id: string,
