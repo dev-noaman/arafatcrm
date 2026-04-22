@@ -30,6 +30,13 @@ export class Client extends BaseEntity {
   @JoinColumn({ name: "assigned_to_id" })
   assignedTo!: User | null;
 
+  @Column({ name: "created_by", nullable: true, type: "uuid" })
+  createdById: string | null = null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: "created_by" })
+  createdBy!: User | null;
+
   @OneToMany(() => Deal, (deal: Deal) => deal.client)
   deals!: Deal[];
 }

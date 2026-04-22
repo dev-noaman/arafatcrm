@@ -13,9 +13,9 @@ export class ClientsService {
     private clientsRepo: Repository<Client>,
   ) {}
 
-  async create(dto: CreateClientDto) {
+  async create(dto: CreateClientDto, userId: string) {
     try {
-      const client = this.clientsRepo.create(dto);
+      const client = this.clientsRepo.create({ ...dto, createdBy: { id: userId } as any });
       return await this.clientsRepo.save(client);
     } catch (error: any) {
       if (error.code === "23505") {
@@ -25,11 +25,11 @@ export class ClientsService {
     }
   }
 
-  async bulkCreate(dtos: CreateClientDto[]) {
+  async bulkCreate(dtos: CreateClientDto[], userId: string) {
     const results = { created: 0, errors: [] as { row: number; message: string }[] };
     for (let i = 0; i < dtos.length; i++) {
       try {
-        const client = this.clientsRepo.create(dtos[i]);
+        const client = this.clientsRepo.create({ ...dtos[i], createdBy: { id: userId } as any });
         await this.clientsRepo.save(client);
         results.created++;
       } catch (error: any) {
@@ -39,10 +39,26 @@ export class ClientsService {
     return results;
   }
 
-  async findAll(pagination: PaginationQueryDto) {
+  async findAll(pagination: PaginationQueryDto, userId?: string, userRole?: string) {
     const { page, limit } = pagination;
+
+    if (userRole === "SALES" && userId) {
+      // SALES sees their own clients + unassigned legacy clients (created_by IS NULL)
+      const qb = this.clientsRepo.createQueryBuilder("client")
+        .leftJoinAndSelect("client.assignedTo", "assignedTo")
+        .leftJoinAndSelect("client.createdBy", "createdBy")
+        .where("client.created_by = :userId OR client.created_by IS NULL", { userId })
+        .orderBy("client.createdAt", "DESC")
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      const [data, total] = await qb.getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    // ADMIN — no filter
     const [data, total] = await this.clientsRepo.findAndCount({
-      relations: ["assignedTo"],
+      relations: ["assignedTo", "createdBy"],
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
@@ -51,13 +67,18 @@ export class ClientsService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, userRole?: string) {
     const client = await this.clientsRepo.findOne({
       where: { id },
-      relations: ["assignedTo"],
+      relations: ["assignedTo", "createdBy"],
     });
 
     if (!client) {
+      throw new NotFoundException(`Client with ID ${id} not found`);
+    }
+
+    // SALES users can see their own clients + unassigned legacy clients (createdById is null)
+    if (userRole === "SALES" && userId && client.createdBy?.id !== userId && client.createdById !== null) {
       throw new NotFoundException(`Client with ID ${id} not found`);
     }
 
@@ -65,7 +86,8 @@ export class ClientsService {
   }
 
   async update(id: string, dto: UpdateClientDto) {
-    const client = await this.findOne(id);
+    const client = await this.clientsRepo.findOne({ where: { id } });
+    if (!client) throw new NotFoundException(`Client with ID ${id} not found`);
     Object.assign(client, dto);
 
     try {
