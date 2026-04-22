@@ -34,6 +34,8 @@ export default function ClientsPage() {
   const [viewClient, setViewClient] = useState<Client | null>(null);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = currentUser?.role === "ADMIN";
 
   const { data, isLoading } = useQuery({
     queryKey: ["clients", page],
@@ -71,20 +73,24 @@ export default function ClientsPage() {
       <Button variant="ghost" size="sm" onClick={() => setViewClient(client)}>
         <Eye className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => setEditClient(client)}>
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          if (confirm(`Delete client ${client.name}?`)) {
-            deleteMutation.mutate(client.id);
-          }
-        }}
-      >
-        <Trash2 className="h-4 w-4 text-red-600" />
-      </Button>
+      {isAdmin && (
+        <>
+          <Button variant="ghost" size="sm" onClick={() => setEditClient(client)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (confirm(`Delete client ${client.name}?`)) {
+                deleteMutation.mutate(client.id);
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </>
+      )}
     </div>
   );
 
