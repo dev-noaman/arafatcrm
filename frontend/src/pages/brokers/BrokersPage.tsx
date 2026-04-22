@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { brokersApi } from "@/api/brokers";
 import { Button, Card, DataTable, Input, PhoneInput, Select, Badge } from "@/components/ui";
 import { Plus, Pencil, Trash2, Eye, Upload, Download, X, FileText, FileUp } from "lucide-react";
+import { useAuthStore } from "@/contexts/auth-store";
 import type { Broker, BrokerType, BrokerDocumentType, CreateBrokerDto, UpdateBrokerDto } from "@/types/broker";
 
 const BROKER_TYPES: { value: BrokerType; label: string }[] = [
@@ -25,6 +26,8 @@ export default function BrokersPage() {
   const [viewBroker, setViewBroker] = useState<Broker | null>(null);
   const [editBroker, setEditBroker] = useState<Broker | null>(null);
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = currentUser?.role === "ADMIN";
 
   const { data, isLoading } = useQuery({
     queryKey: ["brokers", page],
@@ -89,18 +92,22 @@ export default function BrokersPage() {
       <Button variant="ghost" size="sm" onClick={() => setViewBroker(broker)}>
         <Eye className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => setEditBroker(broker)}>
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          if (confirm(`Delete broker ${broker.name}?`)) deleteMutation.mutate(broker.id);
-        }}
-      >
-        <Trash2 className="h-4 w-4 text-red-600" />
-      </Button>
+      {isAdmin && (
+        <Button variant="ghost" size="sm" onClick={() => setEditBroker(broker)}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+      )}
+      {isAdmin && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (confirm(`Delete broker ${broker.name}?`)) deleteMutation.mutate(broker.id);
+          }}
+        >
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      )}
     </div>
   );
 
@@ -152,7 +159,7 @@ export default function BrokersPage() {
         <BulkBrokerModal onClose={() => setShowBulkModal(false)} />
       )}
       {viewBroker && (
-        <ViewBrokerModal broker={viewBroker} onClose={() => setViewBroker(null)} />
+        <ViewBrokerModal broker={viewBroker} onClose={() => setViewBroker(null)} isAdmin={isAdmin} />
       )}
       {editBroker && (
         <EditBrokerModal broker={editBroker} onClose={() => setEditBroker(null)} />
@@ -250,7 +257,7 @@ function CreateBrokerModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ─── View Broker Modal ─── */
-function ViewBrokerModal({ broker, onClose }: { broker: Broker; onClose: () => void }) {
+function ViewBrokerModal({ broker, onClose, isAdmin }: { broker: Broker; onClose: () => void; isAdmin: boolean }) {
   const [uploadingDocType, setUploadingDocType] = useState<BrokerDocumentType | "">("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -330,16 +337,18 @@ function ViewBrokerModal({ broker, onClose }: { broker: Broker; onClose: () => v
                         >
                           <Download className="h-4 w-4" />
                         </a>
-                        <button
-                          onClick={() => {
-                            if (confirm("Delete this document?")) deleteDocMutation.mutate(existing.id);
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              if (confirm("Delete this document?")) deleteDocMutation.mutate(existing.id);
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
-                    ) : (
+                    ) : isAdmin ? (
                       <Button
                         variant="secondary"
                         size="sm"
@@ -350,12 +359,14 @@ function ViewBrokerModal({ broker, onClose }: { broker: Broker; onClose: () => v
                       >
                         <Upload className="h-3 w-3 mr-1" /> Upload
                       </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Not uploaded</span>
                     )}
                   </div>
                 );
               })}
               {/* Others (optional) */}
-              {!requiredDocs.find((d) => d.value === "OTHERS") && (
+              {!requiredDocs.find((d) => d.value === "OTHERS") && isAdmin && (
                 <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-gray-400" />
@@ -384,9 +395,11 @@ function ViewBrokerModal({ broker, onClose }: { broker: Broker; onClose: () => v
                     <a href={brokersApi.getDocumentUrl(doc.path)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
                       <Download className="h-4 w-4" />
                     </a>
-                    <button onClick={() => { if (confirm("Delete?")) deleteDocMutation.mutate(doc.id); }} className="text-red-500 hover:text-red-700">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isAdmin && (
+                      <button onClick={() => { if (confirm("Delete?")) deleteDocMutation.mutate(doc.id); }} className="text-red-500 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
