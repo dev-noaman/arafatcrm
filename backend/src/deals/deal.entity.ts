@@ -3,6 +3,7 @@ import { BaseEntity } from "../common/entities/base.entity";
 import { Client } from "../clients/client.entity";
 import { Broker } from "../brokers/broker.entity";
 import { User } from "../users/user.entity";
+import { OfficerndSync } from "../officernd/entities/officernd-sync.entity";
 
 @Entity("deals")
 export class Deal extends BaseEntity {
@@ -74,4 +75,11 @@ export class Deal extends BaseEntity {
 
   @Column({ name: "stage_history", type: "varchar", array: true, default: "{}" })
   stageHistory!: string[];
+
+  @Column({ name: "officernd_sync_id", type: "uuid", nullable: true })
+  officerndSyncId: string | null = null;
+
+  @ManyToOne(() => OfficerndSync, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "officernd_sync_id" })
+  officerndSync: OfficerndSync | null = null;
 }
