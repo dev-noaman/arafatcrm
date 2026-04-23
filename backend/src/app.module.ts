@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
 import { APP_GUARD } from "@nestjs/core";
 import { ServeStaticModule } from "@nestjs/serve-static";
+import { ScheduleModule } from "@nestjs/schedule";
 import { join } from "path";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -17,6 +18,7 @@ import { ReportsModule } from "./reports/reports.module";
 import { DataSourcesModule } from "./data-sources/data-sources.module";
 import { MailModule } from "./mail/mail.module";
 import { TodosModule } from "./todos/todos.module";
+import { OfficerndModule } from "./officernd/officernd.module";
 import { JwtGuard, RolesGuard } from "./common/guards";
 
 @Module({
@@ -49,8 +51,10 @@ import { JwtGuard, RolesGuard } from "./common/guards";
     DashboardModule,
     ReportsModule,
     DataSourcesModule,
+    ScheduleModule.forRoot(),
     MailModule,
     TodosModule,
+    OfficerndModule,
   ],
   controllers: [AppController],
   providers: [
