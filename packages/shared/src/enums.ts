@@ -14,6 +14,8 @@ export const ClientSource = {
   PROPERTY_FINDER: "PROPERTY_FINDER",
   MAZAD_ARAB: "MAZAD_ARAB",
   REFERRAL: "REFERRAL",
+  WEBSITE: "WEBSITE",
+  OFFICERND_RENEWAL: "OFFICERND_RENEWAL",
 } as const;
 export type ClientSource = (typeof ClientSource)[keyof typeof ClientSource];
 
@@ -83,3 +85,11 @@ export const BrokerDocumentType = {
 } as const;
 export type BrokerDocumentType =
   (typeof BrokerDocumentType)[keyof typeof BrokerDocumentType];
+
+export const OfficerndSyncStatus = {
+  PENDING: "PENDING",
+  ASSIGNED: "ASSIGNED",
+  PIPELINED: "PIPELINED",
+  IGNORED: "IGNORED",
+} as const;
+export type OfficerndSyncStatus = (typeof OfficerndSyncStatus)[keyof typeof OfficerndSyncStatus];

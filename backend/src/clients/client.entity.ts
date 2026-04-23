@@ -14,7 +14,7 @@ export class Client extends BaseEntity {
   @Column({ nullable: true, type: "varchar" })
   phone: string | null = null;
 
-  @Column({ type: "varchar", enum: ["FACEBOOK", "INSTAGRAM", "TIKTOK", "BROKER", "GOOGLE"], default: "BROKER" })
+  @Column({ type: "varchar", enum: ["MZAD_QATAR", "FACEBOOK", "GOOGLE", "INSTAGRAM", "TIKTOK", "YOUTUBE", "PROPERTY_FINDER", "MAZAD_ARAB", "REFERRAL", "WEBSITE", "BROKER", "OFFICERND_RENEWAL"], default: "BROKER" })
   source: string = "BROKER";
 
   @Column({ nullable: true, type: "varchar" })
