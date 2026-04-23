@@ -200,7 +200,7 @@ export class OfficerndService {
     const companyName =
       membership.companyName ||
       membership.company?.name ||
-      membership.companyName ||
+      membership.company?.companyName ||
       "Unknown Company";
     const contactEmail = membership.contactEmail || membership.member?.email || null;
     const contactPhone = membership.contactPhone || membership.member?.phone || null;
@@ -444,8 +444,11 @@ export class OfficerndService {
     const sync = await this.syncRepo.findOne({ where: { id } });
     if (!sync) throw new NotFoundException();
     if (sync.upstreamChanges) {
+      const allowedFields = new Set(["companyName", "contactEmail", "contactPhone", "membershipType", "membershipValue", "endDate"]);
       for (const [field, change] of Object.entries(sync.upstreamChanges)) {
-        (sync as any)[field] = change.new;
+        if (allowedFields.has(field)) {
+          (sync as any)[field] = change.new;
+        }
       }
     }
     sync.upstreamChanges = null;

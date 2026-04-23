@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsString, ArrayNotEmpty } from "class-validator";
+import { IsArray, IsUUID, ArrayNotEmpty } from "class-validator";
 
 export class BulkSendToPipelineDto {
-  @ApiProperty() @IsArray() @ArrayNotEmpty() @IsString({ each: true }) ids: string[] = [];
+  @ApiProperty() @IsArray() @ArrayNotEmpty() @IsUUID("4", { each: true }) ids: string[] = [];
 }

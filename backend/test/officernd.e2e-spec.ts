@@ -20,6 +20,7 @@ describe("OfficeRnD Module e2e Tests", () => {
   let upstreamChangedSyncId: string;
 
   beforeAll(async () => {
+    process.env.JWT_SECRET = "test-secret-key-for-testing";
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

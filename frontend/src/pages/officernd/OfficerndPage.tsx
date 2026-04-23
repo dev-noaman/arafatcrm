@@ -731,7 +731,7 @@ function Row({
             {item.assignedUser.name || item.assignedUser.email}
           </span>
         ) : (
-          <span className="text-sm text-gray-400">Unassigned</span>
+          <span className="text-sm text-gray-500">Unassigned</span>
         )}
       </td>
 
