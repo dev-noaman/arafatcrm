@@ -11,6 +11,7 @@ import ReportsPage from "@/pages/reports/ReportsPage";
 import UsersPage from "@/pages/users/UsersPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import RequireRole from "@/components/RequireRole";
+import OfficerndPage from "@/pages/officernd/OfficerndPage";
 
 console.log("[App.tsx] Rendering App component");
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="pipeline" element={<PipelinePage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="users" element={<RequireRole role="ADMIN"><UsersPage /></RequireRole>} />
+        <Route path="officernd" element={<RequireRole role="ADMIN"><OfficerndPage /></RequireRole>} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

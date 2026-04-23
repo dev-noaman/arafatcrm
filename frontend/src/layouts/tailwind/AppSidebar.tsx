@@ -13,6 +13,7 @@ import {
   TaskIcon,
   UserCircleIcon,
 } from "../../icons";
+import { Building2 } from "lucide-react";
 import { useSidebar } from "../../context/SidebarContext";
 import { useAuthStore } from "../../contexts/auth-store";
 
@@ -50,6 +51,12 @@ const navItems: NavItem[] = [
     icon: <DollarLineIcon />,
     name: "Deals",
     path: "/deals",
+  },
+  {
+    icon: <Building2 />,
+    name: "OfficeRnD",
+    path: "/officernd",
+    adminOnly: true,
   },
 
   {
