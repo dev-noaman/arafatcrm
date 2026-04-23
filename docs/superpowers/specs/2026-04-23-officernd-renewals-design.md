@@ -57,7 +57,7 @@ Integrate OfficeRnD API to surface companies whose memberships expire within the
 
 Add nullable column `officernd_sync_id` (FK → `officernd_sync.id`, **ON DELETE SET NULL**). Deals with this set are OfficeRnD renewals — frontend uses this to render distinct cards.
 
-### 1.4 Enum Addition
+### 1.4 Enum Additions
 
 Add to `packages/shared/src/enums.ts`:
 
@@ -72,6 +72,8 @@ export const OfficerndSyncStatus = {
 
 Add `OFFICERND_RENEWAL` to `ClientSource` enum. Used when auto-creating clients from OfficeRnD data.
 
+**Important:** The client entity (`backend/src/clients/client.entity.ts`) has an inline enum on the `source` column that does not include all `ClientSource` values. Update the entity's inline enum array to include all `ClientSource` values (not just the current 5), including `OFFICERND_RENEWAL`. Without this, auto-created clients will fail at the database level.
+
 ---
 
 ## 2. Backend — Module & API
@@ -79,10 +81,14 @@ Add `OFFICERND_RENEWAL` to `ClientSource` enum. Used when auto-creating clients 
 ### 2.1 New Module: `OfficerndModule`
 
 Registered in `AppModule`. Contains:
-- `OfficerndSyncEntity` + `OfficerndSyncRunEntity`
+- `OfficerndSyncEntity` + `OfficerndSyncRunEntity` (both extend `BaseEntity`)
 - `OfficerndService` — sync logic, OfficeRnD API calls
 - `OfficerndController` — REST endpoints
 - DTOs with `class-validator`, `whitelist: true`, `forbidNonWhitelisted: true`
+
+**New dependencies required:**
+- `@nestjs/schedule` — install and register `ScheduleModule.forRoot()` in `AppModule`
+- `@nestjs/axios` — HTTP client for OfficeRnD API calls
 
 ### 2.2 `OfficerndService` Methods
 
@@ -95,7 +101,7 @@ Registered in `AppModule`. Contains:
 | `assignSalesRep(id, userId)` | Set `assignedTo`, status → ASSIGNED |
 | `unassign(id)` | Clear `assignedTo`, status → PENDING |
 | `bulkAssign(ids[], userId)` | Batch assign |
-| `sendToPipeline(id)` | Validate ASSIGNED. Auto-create Client (dedup by email/phone, source=OFFICERND_RENEWAL) if no `clientId`. Create Deal (stage=NEW, ownerId=assignedTo, value=membershipValue, title=`"{companyName} — Renewal"`, officerndSyncId=id). Set dealId, clientId, status → PIPELINED. |
+| `sendToPipeline(id)` | Validate ASSIGNED. Auto-create Client (dedup by email/phone, source=OFFICERND_RENEWAL) if no `clientId`. **Wrap Client creation + Deal creation + sync row update in a database transaction.** Create Deal with: `stage="NEW"`, `stageHistory=["NEW"]`, `status="active"`, `ownerId=assignedTo`, `value=membershipValue`, `title="{companyName} — Renewal"`, `officerndSyncId=id`, `location="BARWA_ALSADD"` (default — admin can change in pipeline), `spaceType="CLOSED_OFFICE"` (default — admin can change). `commissionRate` and `commissionAmount` are null (no broker on renewal deals). Set dealId, clientId, status → PIPELINED. |
 | `bulkSendToPipeline(ids[])` | Batch send |
 | `ignore(id)` | status → IGNORED |
 | `unignore(id)` | status → PENDING |
@@ -156,6 +162,7 @@ When `sendToPipeline` runs and no `clientId` exists on the sync row:
 - Dedup: check if a client with matching email or phone already exists.
 - If found: link existing client to sync row.
 - If not found: create Client with `name=companyName`, `email=contactEmail`, `phone=contactPhone`, `source=OFFICERND_RENEWAL`.
+- **Nullable email edge case:** Client entity has `unique: true` on email. If `contactEmail` is null, generate a placeholder: `{officerndCompanyId}@officernd.placeholder`. This avoids unique constraint collisions when multiple companies have no email. These placeholders are clearly not real emails and admin can update in the pipeline.
 
 ---
 
@@ -165,10 +172,19 @@ When `sendToPipeline` runs and no `clientId` exists on the sync row:
 
 New item in `AppSidebar.tsx`:
 ```typescript
-{ icon: <OfficeBuildingIcon />, name: "OfficeRnD", path: "/officernd", adminOnly: true }
+{ icon: <Building2 />, name: "OfficeRnD", path: "/officernd", adminOnly: true }
 ```
 
-### 3.2 New Page: `OfficerndPage.tsx` at `/officernd`
+Use Lucide `Building2` icon (already used in `PipelinePage.tsx`). Add a new SVG icon to `frontend/src/icons/` only if a custom icon is preferred.
+
+### 3.2 Route Configuration
+
+In `App.tsx`, wrap the `/officernd` route with `<RequireRole role="ADMIN">`, matching the existing pattern for `/users`:
+```tsx
+<Route path="/officernd" element={<RequireRole role="ADMIN"><OfficerndPage /></RequireRole>} />
+```
+
+### 3.3 New Page: `OfficerndPage.tsx` at `/officernd`
 
 **Header bar:** Title "OfficeRnD Renewals", last sync relative timestamp ("12 minutes ago"), "Sync Now" button (disabled + spinner during active sync).
 
@@ -201,7 +217,7 @@ New item in `AppSidebar.tsx`:
 
 **No sales reps:** Message + link to `/users` to create one.
 
-### 3.3 Pipeline Card Changes (`PipelinePage.tsx`)
+### 3.4 Pipeline Card Changes (`PipelinePage.tsx`)
 
 Detect deals where `officerndSyncId` is set:
 - Render with distinct styling: small OfficeRnD icon/badge (no colored border)
@@ -222,3 +238,8 @@ Reminders for the implementation phase:
 6. **PM2 env caching** (gotcha #20): deploying requires `pm2 delete && pm2 start` to pick up new `OFFICERND_*` env vars, not just `pm2 restart`
 7. **Rotate `OFFICERND_CLIENT_SECRET`** — it was shared in the uploaded doc and should be treated as compromised
 8. **Verify OAuth scope necessity:** log first real membership payload, check if contact info is present without `flex.community.members.read`. Add only if needed.
+9. **Install `@nestjs/schedule`** and register `ScheduleModule.forRoot()` in `AppModule` before using `@Cron`.
+10. **Install `@nestjs/axios`** for HTTP client to call OfficeRnD API.
+11. **Update client entity inline enum** — widen the `source` column enum to include all `ClientSource` values including `OFFICERND_RENEWAL`.
+12. **Transaction for `sendToPipeline`** — wrap Client creation + Deal creation + sync row update in `EntityManager.transaction`.
+13. **`acknowledgeUpstreamChange` does NOT update the linked deal** — only updates the `officernd_sync` row. Admin must manually update the deal if desired.
