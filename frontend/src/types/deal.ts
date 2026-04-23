@@ -23,6 +23,7 @@ export interface Deal {
   client: Client;
   broker: Broker | null;
   owner: User;
+  officerndSyncId?: string | null;
   stageHistory: string[];
   createdAt: string;
   updatedAt: string;

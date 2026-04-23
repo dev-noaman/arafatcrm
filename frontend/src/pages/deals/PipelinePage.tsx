@@ -68,7 +68,7 @@ function DealCard({
           <p className="text-xs text-gray-500 truncate mt-0.5">
             {deal.client?.company || "N/A"}
           </p>
-          <p className="text-xs text-gray-400 truncate mt-0.5">
+          <p className="text-xs text-gray-500 truncate mt-0.5">
             {{ CLOSED_OFFICE: "Closed Office", ABC_ADDRESS: "Abc Address", ABC_FLEX: "Abc Flex", ABC_ELITE: "Abc Elite", WORKSTATION: "Workstation", OFFICE: "Office" }[deal.spaceType] || deal.spaceType}
             {deal.location && ` · ${deal.location.replace(/_/g, " ")}`}
           </p>
@@ -79,26 +79,37 @@ function DealCard({
         <span className="text-sm font-bold text-gray-900">
           QAR {deal.value.toLocaleString()}
         </span>
-        {deal.owner && (
-          <div
-            className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-            style={{ backgroundColor: "#465FFF" }}
-            title={deal.owner.name || deal.owner.email}
-          >
-            {(deal.owner.name || deal.owner.email).charAt(0).toUpperCase()}
-          </div>
-        )}
+        <div className="flex items-center gap-1.5">
+          {deal.officerndSyncId && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">OfficeRnD</span>
+          )}
+          {deal.owner && (
+            <div
+              className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+              style={{ backgroundColor: "#465FFF" }}
+              title={deal.owner.name || deal.owner.email}
+            >
+              {(deal.owner.name || deal.owner.email).charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
       </div>
 
-      {deal.expectedCloseDate && (
+      {deal.officerndSyncId && deal.expectedCloseDate ? (
         <div className="pl-6 mt-2">
-          <span className="text-[11px] text-gray-400">
+          <p className="text-xs text-gray-500">
+            Renewal by: {new Date(deal.expectedCloseDate).toLocaleDateString()}
+          </p>
+        </div>
+      ) : deal.expectedCloseDate ? (
+        <div className="pl-6 mt-2">
+          <span className="text-[11px] text-gray-500">
             Close: {new Date(deal.expectedCloseDate).toLocaleDateString()}
           </span>
         </div>
-      )}
+      ) : null}
 
-      <div className="pl-6 mt-2 flex items-center gap-3 text-[11px] text-gray-400">
+      <div className="pl-6 mt-2 flex items-center gap-3 text-[11px] text-gray-500">
         {deal.broker && (
           <span>Broker: {deal.broker.name}</span>
         )}
@@ -161,12 +172,12 @@ function StageColumn({
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => onAddDeal(stage.id)}
-            className="p-1.5 rounded-md text-gray-400 hover:text-[#465FFF] hover:bg-gray-100 transition-colors"
-            title="Add deal"
+            className="p-1.5 rounded-md text-gray-400 hover:text-[#465FFF] hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+            aria-label="Add deal"
           >
             <Plus className="h-4 w-4" />
           </button>
-          <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+          <button className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300" aria-label="Deal options">
             <MoreVertical className="h-4 w-4" />
           </button>
         </div>
@@ -241,6 +252,7 @@ function CreateDealModal({
     { value: "PROPERTY_FINDER", label: "Property Finder" },
     { value: "MAZAD_ARAB", label: "Mazad Arab" },
     { value: "REFERRAL", label: "Referral" },
+    { value: "WEBSITE", label: "Website" },
   ];
 
   const createMutation = useMutation({
@@ -308,7 +320,7 @@ function CreateDealModal({
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
           <h2 className="text-lg font-semibold">Add New Deal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {!showNewClient ? (
@@ -462,15 +474,15 @@ function DealDetailModal({ deal, onClose, brokers, users }: { deal: Deal; onClos
           <div className="flex items-center gap-2">
             {!isEditing && (
               <>
-                <button onClick={() => setIsEditing(true)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-md">
+                <button onClick={() => setIsEditing(true)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-300" aria-label="Edit deal">
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button onClick={() => { if (confirm("Delete this deal?")) deleteMutation.mutate(); }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-md">
+                <button onClick={() => { if (confirm("Delete this deal?")) deleteMutation.mutate(); }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-300" aria-label="Delete deal">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </>
             )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
           </div>
         </div>
 
