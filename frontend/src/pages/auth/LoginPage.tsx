@@ -26,15 +26,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      console.log("[LoginPage] Attempting login with:", { email: data.email });
       const response = await authApi.login(data);
-      console.log("[LoginPage] Login response:", response);
       localStorage.setItem("accessToken", response.accessToken);
       setUser(response.user);
-      console.log("[LoginPage] User set in auth store:", response.user);
       navigate("/dashboard");
     } catch (err: any) {
-      console.error("[LoginPage] Login error:", err);
       setError(err.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);

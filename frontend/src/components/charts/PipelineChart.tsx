@@ -18,7 +18,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function PipelineChart({ data }: Props) {
-  if (!data.length) return <div className="flex items-center justify-center h-[300px] text-gray-400">No data available</div>;
+  if (!data.length) return <div className="flex items-center justify-center h-[300px] text-gray-500">No data available</div>;
 
   return (
     <ApexChart

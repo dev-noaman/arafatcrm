@@ -51,13 +51,14 @@ pnpm --filter backend test:e2e -- --testPathPattern=deals
 Each module follows NestJS conventions with entity, controller, service, and DTOs:
 - `auth/` - JWT auth with Passport, profile endpoints (`GET /auth/me`, `PUT /auth/profile`)
 - `users/` - User management (admin-only CRUD)
-- `clients/` - Client records with bulk import
+- `clients/` - Client records with bulk import, SALES role scoped to own clients only (`created_by = userId`), create auto-sets `createdBy`
 - `brokers/` - Broker management with contract dates, broker type (Personal/Corporate), document uploads (QID, CR, TL, Computer Card, Others), `broker-document.entity.ts` for file attachments with CASCADE delete, `broker-upload.helper.ts` for Multer config (10MB, PDF/JPEG/PNG/WebP), bulk import
 - `deals/` - Deal pipeline with stage transitions, phone field, ownerId assignment, default stage "NEW"
 - `todos/` - Todo list CRUD scoped by userId
 - `dashboard/` - Stats and analytics
 - `reports/` - Overall staff summary (with month filter, win/lost rates), staff win/loss + win rate charts, location/source charts, pipeline stage chart, broker performance (with month filter), space type breakdown
 - `data-sources/` - Dynamic data sources CRUD (backend only, frontend uses hardcoded list)
+- `officernd/` - OfficeRnD membership sync (cron every 30 min at :07/:37 Asia/Qatar), triage with assign/bulk-send-to-pipeline, `officernd_sync` entity (per-membership rows with PENDING→ASSIGNED→PIPELINED→IGNORED lifecycle), `officernd_sync_runs` entity (sync history), all endpoints admin-only via `@Roles(Role.ADMIN)`. Sync service never touches deals after initial push — only flags `upstreamChanges` diff for non-PENDING rows. Client auto-create uses source `OFFICERND_RENEWAL` with email dedup. Background sync uses `@nestjs/schedule` + `@nestjs/axios`. Pipeline deals from OfficeRnD have `officerndSyncId` FK set.
 - `mail/` - SMTP email via `@nestjs-modules/mailer` + `nodemailer`
 
 ### Frontend Stack
@@ -77,6 +78,7 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `/deals` - Deal table with filters, client autocomplete, inline new client creation, Sales Rep and Broker columns
 - `/reports` - Overall staff summary (month filter, win/lost rates), staff win/loss + win rate charts, location/source charts (ApexCharts), space type breakdown, pipeline stage table, broker performance (month filter), PDF export
 - `/users` - User management (admin-only)
+- `/officernd` - OfficeRnD renewal triage (admin-only): table of expiring memberships, inline assign-to dropdown, bulk send-to-pipeline, status tabs (default=PENDING), upstream change flags, sync-now button
 - `/profile` - Edit name, email, change password
 
 ### Key Components
@@ -84,6 +86,7 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `ClientAutocomplete` - Searchable dropdown filtering by name/phone/email, with "Create new client" link
 - `GlobalSearch` - Navbar search (Ctrl+K) across clients and deals with dropdown results
 - `TodoCard` - Inline todo widget with add/toggle/delete (removed from dashboard)
+- `Modal` - Accessible modal wrapper with `role="dialog"`, `aria-modal`, focus trap, Escape to close, focus restore on close. All modals should use this component instead of raw `div.fixed.inset-0`.
 
 ### Key Patterns
 - **Entities**: TypeORM with snake_case columns via `@Column({ name: "snake_case" })`
@@ -91,18 +94,22 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - **Validation**: class-validator DTOs with `whitelist: true` and `forbidNonWhitelisted: true`
 - **Auth**: JwtGuard extracts user from Bearer token, sets `req.user = { id, email, role }`
 - **Roles**: `@Roles(Role.ADMIN)` decorator with RolesGuard; sidebar filters by `adminOnly` flag
+- **SALES scoping**: SALES users see only their own data in clients (`created_by = userId`), deals (`ownerId = userId`), dashboard (personal stats); frontend hides edit/delete buttons and assign-to fields for SALES
 - **Global prefix**: `api/v1` configured in main.ts
 - **Bulk import**: CSV file upload or text paste, downloadable template, auto-strips header row
+- **Accessibility**: All icon-only buttons must have `aria-label`. Use the shared `Modal` component for all modals (provides focus trap, aria-modal, Escape handling). Input/Select show red `*` when `required`. Use `text-gray-500` (not `text-gray-400`) for readable text to meet WCAG 4.5:1 contrast. Button touch targets are min 44x44px via `min-h-[44px]`/`min-w-[44px]`.
 
 ### Shared Package (`packages/shared`)
 Contains enums and DTOs used by both frontend and backend:
 - `DealStatus`: active, won, lost
 - `DealStage`: lead, NEW, QUALIFIED, MEETING, PROPOSAL, NEGOTIATION, CONTRACT, WON, LOST
-- `ClientSource`: MZAD_QATAR, FACEBOOK, GOOGLE, INSTAGRAM, TIKTOK, YOUTUBE, PROPERTY_FINDER, MAZAD_ARAB, REFERRAL
+- `ClientSource`: MZAD_QATAR, FACEBOOK, GOOGLE, INSTAGRAM, TIKTOK, YOUTUBE, PROPERTY_FINDER, MAZAD_ARAB, REFERRAL, WEBSITE
 - `DealLocation`: BARWA_ALSADD, ELEMENT_WESTBAY, MARINA50_LUSAIL
 - `DealSpaceType`: CLOSED_OFFICE, ABC_ADDRESS, ABC_FLEX, ABC_ELITE
 - `BrokerType`: PERSONAL, CORPORATE
 - `BrokerDocumentType`: QID, CR, TL, COMPUTER_CARD, OTHERS
+- `OfficerndSyncStatus`: PENDING, ASSIGNED, PIPELINED, IGNORED
+- `ClientSource` also includes: `OFFICERND_RENEWAL` (used for auto-created clients from OfficeRnD sync)
 
 ## Environment Variables
 
@@ -118,7 +125,12 @@ SMTP_HOST=smtp.emailit.com
 SMTP_PORT=587
 SMTP_USER=emailit
 SMTP_PASS=secret_MVseUMO7WC0OLrvQqK2poXdjKU986HWg
-SMTP_FROM=info@arafatvisitor.cloud
+SMTP_FROM=info@arafatcrm.cloud
+OFFICERND_ORG_SLUG=arafat-business-centers
+OFFICERND_CLIENT_ID=...
+OFFICERND_CLIENT_SECRET=...
+OFFICERND_GRANT_TYPE=client_credentials
+OFFICERND_SCOPE=flex.community.memberships.read flex.community.companies.read
 ```
 
 ## Environment Setup
@@ -161,4 +173,17 @@ pnpm dev
 14. **Upload serving**: Backend uses `@nestjs/serve-static` at `/uploads`; frontend proxies `/uploads` to backend via Vite config.
 15. **Frontend .env**: `VITE_API_URL=/api/v1` (uses Vite proxy, not direct backend URL). Backend runs on port 3001.
 16. **Bulk import CSV templates**: Brokers: `Name,Email,Phone,Company,BrokerType,ContractFrom,ContractTo`. Clients: `Name,Email,Phone,Company,Source`. Auto-strips header row if detected.
-17. **Source chart colors**: Each client source has a distinct brand color (MZAD=blue, Facebook=#1877F2, Google=red, Instagram=pink, TikTok=black, YouTube=red, PropertyFinder=cyan, MazadArab=purple, Referral=green, Broker=amber).
+17. **Source chart colors**: Each client source has a distinct brand color (MZAD=pink, Facebook=blue, Google=red, Instagram=purple, TikTok=teal, YouTube=orange, PropertyFinder=cyan, MazadArab=violet, Referral=green, Broker=amber, Website=indigo).
+18. **SALES client scoping**: SALES users only see clients they created (`created_by = userId` filter in service). No legacy null fallback. Creating a client auto-sets `createdBy`. Edit/delete buttons hidden for SALES in frontend.
+19. **VPS deployment**: Use `Deploy-to-VPS.ps1` — first run with `-Init` flag, subsequent runs without for updates. VPS at `72.62.189.36`, domain `arafatcrm.cloud`, PM2 process name `arafatcrm-api`, nginx reverse proxy, entry point `dist/src/main.js`.
+20. **PM2 env caching**: PM2 caches environment variables from first start — must `pm2 delete` and recreate (not just restart) to clear cached env vars like `CORS_ORIGIN`.
+21. **PM2 ecosystem config**: Use `/var/www/arafatcrm/ecosystem.config.js` with `cwd: "/var/www/arafatcrm/backend"` so NestJS `ConfigModule` finds `.env`. Always `pm2 start ecosystem.config.js` instead of `pm2 start dist/src/main.js` directly — otherwise `.env` is not loaded (PM2 doesn't read `.env` files; NestJS reads `.env` from cwd).
+22. **`multer` dependency**: Must be in `backend/package.json` dependencies (not just `@types/multer`). The deploy script wipes `node_modules` on each deploy, so `pnpm install` must find it in `package.json`.
+23. **OfficeRnD sync overwrite policy**: PENDING rows are overwritten freely on re-sync. ASSIGNED/IGNORED/PIPELINED rows are NOT overwritten — incoming diffs are stored in `upstreamChanges` jsonb with `upstreamChangedAt` timestamp. Admin must acknowledge to apply changes. The sync service never touches deals after the initial pipeline push.
+24. **OfficeRnD client auto-create**: When sending to pipeline, dedup by email or phone. If `contactEmail` is null, generate `{officerndCompanyId}@officernd.placeholder` to avoid unique constraint collision.
+25. **OfficeRnD deal defaults**: Renewal deals get `location="BARWA_ALSADD"`, `spaceType="CLOSED_OFFICE"`, `stage="NEW"`, no broker, no commission. Admin can change these in the pipeline.
+26. **OfficeRnD pipeline cards**: Deals with `officerndSyncId` set render with a purple "OfficeRnD" badge and show renewal date in the pipeline kanban.
+27. **Circular entity import**: `deal.entity.ts` imports `OfficerndSync` and `officernd-sync.entity.ts` imports `Deal`. TypeORM handles this via lazy `() => Entity` syntax — both entities use this pattern.
+28. **OfficeRnD API endpoints**: Memberships at `/api/v2/organizations/{slug}/memberships`, companies at `/api/v2/organizations/{slug}/companies`. Both use `$limit=50` max and `cursorNext` pagination. No `$expand` support — company/member IDs must be resolved separately. Membership fields: `_id`, `company` (ID), `name`, `price`, `endDate`, `member` (ID). Company fields: `_id`, `name`, `email`, `address`. The ID field is `_id` (not `id`).
+29. **OfficeRnD data enrichment**: Memberships only contain a company ID reference. The sync service fetches all companies into a `Map<id, company>` first, then enriches each membership with `companyName` and `contactEmail` from that map. No member endpoint available with our OAuth scope.
+30. **OfficeRnD query method**: Use `findAndCount` with `relations: ["assignedUser", "client", "deal"]` — NOT `createQueryBuilder` with `leftJoinAndSelect`. The QueryBuilder approach fails at runtime with `TypeError: Cannot read properties of undefined (reading 'databaseName')` in production.

@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Search,
   Send,
-  UserPlus,
   EyeOff,
   Eye,
   X,
@@ -28,6 +27,11 @@ const TABS: { value: TabStatus; label: string }[] = [
   { value: "PIPELINED", label: "Pipelined" },
   { value: "IGNORED", label: "Ignored" },
 ];
+
+const LOCATION_MAP: Record<string, string> = {
+  "5b30ea1c14fb5716001c579c": "Barwa Alsadd",
+  "6433f1d199bcbae655d937d0": "Element Westbay",
+};
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: "bg-gray-100 text-gray-700",
@@ -283,10 +287,6 @@ export default function OfficerndPage() {
 
   const counts = syncStatus?.counts ?? {};
 
-  /* ─── Inline assign dropdown state ─── */
-
-  const [inlineAssignId, setInlineAssignId] = useState<string | null>(null);
-
   /* ─── Render ─── */
 
   return (
@@ -482,7 +482,7 @@ export default function OfficerndPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 w-10">
+                  <th className="px-3 py-2 w-10">
                     <input
                       type="checkbox"
                       checked={items.length > 0 && selectedIds.size === items.length}
@@ -491,13 +491,15 @@ export default function OfficerndPage() {
                       aria-label="Select all"
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Membership</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Upstream</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">End Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Upstream</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -508,8 +510,6 @@ export default function OfficerndPage() {
                     selected={selectedIds.has(item.id)}
                     onToggle={() => toggleSelect(item.id)}
                     salesReps={salesReps}
-                    inlineAssignId={inlineAssignId}
-                    onSetInlineAssignId={setInlineAssignId}
                     onAssign={(id, userId) => assignMutation.mutate({ id, userId })}
                     onUnassign={(id) => unassignMutation.mutate(id)}
                     onIgnore={(id) => ignoreMutation.mutate(id)}
@@ -609,8 +609,6 @@ interface RowProps {
   selected: boolean;
   onToggle: () => void;
   salesReps: { id: string; name: string | null; email: string }[];
-  inlineAssignId: string | null;
-  onSetInlineAssignId: (id: string | null) => void;
   onAssign: (id: string, userId: string) => void;
   onUnassign: (id: string) => void;
   onIgnore: (id: string) => void;
@@ -626,8 +624,6 @@ function Row({
   selected,
   onToggle,
   salesReps,
-  inlineAssignId,
-  onSetInlineAssignId,
   onAssign,
   onUnassign,
   onIgnore,
@@ -638,16 +634,14 @@ function Row({
   sendPending,
 }: RowProps) {
   const endDisplay = getEndDateClass(item.endDate);
-
-  const handleInlineAssign = (userId: string) => {
-    onAssign(item.id, userId);
-    onSetInlineAssignId(null);
-  };
+  const locationId = item.officerndData?.location ?? "";
+  const locationName = LOCATION_MAP[locationId] || locationId || "-";
+  const canAssign = item.status === "PENDING" || item.status === "ASSIGNED" || item.status === "IGNORED";
 
   return (
     <tr className={selected ? "bg-blue-50" : "hover:bg-gray-50"}>
       {/* Checkbox */}
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <input
           type="checkbox"
           checked={selected}
@@ -658,85 +652,69 @@ function Row({
       </td>
 
       {/* Company */}
-      <td className="px-4 py-3">
-        <div>
-          <div className="font-medium text-gray-900">
-            {item.companyName}
-          </div>
-          <div className="text-xs text-gray-500">
-            {item.membershipType || "Unknown"}
-          </div>
-          {(item.contactEmail || item.contactPhone) && (
-            <div className="text-xs text-gray-500 mt-0.5">
-              {item.contactEmail}
-              {item.contactEmail && item.contactPhone && " | "}
-              {item.contactPhone}
-            </div>
-          )}
-        </div>
+      <td className="px-3 py-2 text-sm font-medium text-gray-900 whitespace-nowrap max-w-[200px] truncate" title={item.companyName}>
+        {item.companyName}
       </td>
 
-      {/* Membership */}
-      <td className="px-4 py-3 text-sm text-gray-700">
+      {/* Value */}
+      <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
         {formatCurrency(item.membershipValue)}
       </td>
 
-      {/* End Date */}
-      <td className="px-4 py-3">
-        <div>
-          <div className={`text-sm ${endDisplay.className}`}>
-            {new Date(item.endDate).toLocaleDateString()}
-          </div>
-          {endDisplay.badge && (
-            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-              {endDisplay.badge}
-            </span>
-          )}
-        </div>
+      {/* Type */}
+      <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
+        {item.membershipType || "-"}
       </td>
 
-      {/* Assigned To */}
-      <td className="px-4 py-3">
-        {inlineAssignId === item.id ? (
-          <div className="flex items-center gap-1">
-            <select
-              autoFocus
-              className="rounded border border-gray-300 px-2 py-1 text-sm min-h-[44px]"
-              aria-label="Select sales rep"
-              defaultValue={item.assignedTo ?? ""}
-              onChange={(e) => {
-                if (e.target.value) handleInlineAssign(e.target.value);
-              }}
-              onBlur={() => onSetInlineAssignId(null)}
-            >
-              <option value="" disabled>
-                Select...
+      {/* Location */}
+      <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
+        {locationName}
+      </td>
+
+      {/* End Date */}
+      <td className="px-3 py-2 whitespace-nowrap">
+        <span className={`text-sm ${endDisplay.className}`}>
+          {new Date(item.endDate).toLocaleDateString()}
+        </span>
+        {endDisplay.badge && (
+          <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+            {endDisplay.badge}
+          </span>
+        )}
+      </td>
+
+      {/* Assigned To — always-visible dropdown */}
+      <td className="px-3 py-2">
+        {canAssign ? (
+          <select
+            className="rounded border border-gray-300 px-2 py-1 text-sm min-h-[36px] disabled:opacity-50"
+            aria-label="Assign sales rep"
+            value={item.assignedTo ?? ""}
+            disabled={assignPending}
+            onChange={(e) => {
+              if (e.target.value) {
+                onAssign(item.id, e.target.value);
+              }
+            }}
+          >
+            <option value="">Unassigned</option>
+            {salesReps.map((rep) => (
+              <option key={rep.id} value={rep.id}>
+                {rep.name || rep.email}
               </option>
-              {salesReps.map((rep) => (
-                <option key={rep.id} value={rep.id}>
-                  {rep.name || rep.email}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => onSetInlineAssignId(null)}
-              className="text-gray-400 hover:text-gray-600 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
-              aria-label="Cancel assign"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+            ))}
+          </select>
         ) : item.assignedUser ? (
           <span className="text-sm text-gray-700">
             {item.assignedUser.name || item.assignedUser.email}
           </span>
         ) : (
-          <span className="text-sm text-gray-500">Unassigned</span>
+          <span className="text-sm text-gray-500">-</span>
         )}
       </td>
 
       {/* Status Badge */}
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <span
           className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_BADGE[item.status] ?? "bg-gray-100 text-gray-700"}`}
         >
@@ -745,9 +723,9 @@ function Row({
       </td>
 
       {/* Upstream */}
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         {item.upstreamChangedAt ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <span className="relative group">
               <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-pre max-w-xs z-10">
@@ -771,28 +749,17 @@ function Row({
       </td>
 
       {/* Actions */}
-      <td className="px-4 py-3 text-right">
+      <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
           {item.status === "PENDING" && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onSetInlineAssignId(item.id)}
-                disabled={assignPending}
-                aria-label="Assign renewal"
-              >
-                <UserPlus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onIgnore(item.id)}
-                aria-label="Ignore renewal"
-              >
-                <EyeOff className="h-4 w-4" />
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onIgnore(item.id)}
+              aria-label="Ignore renewal"
+            >
+              <EyeOff className="h-4 w-4" />
+            </Button>
           )}
 
           {item.status === "ASSIGNED" && (
@@ -812,7 +779,7 @@ function Row({
                 onClick={() => onUnassign(item.id)}
                 aria-label="Unassign renewal"
               >
-                <UserPlus className="h-4 w-4 text-gray-400" />
+                <X className="h-4 w-4 text-gray-400" />
               </Button>
               <Button
                 variant="ghost"

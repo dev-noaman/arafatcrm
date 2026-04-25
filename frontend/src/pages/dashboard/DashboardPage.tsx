@@ -65,14 +65,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Deals by Location">
           {locationLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>
+            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
           ) : (
             <LocationChart data={byLocation ?? []} />
           )}
         </Card>
         <Card title="Deals by Client Source">
           {sourceLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>
+            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
           ) : (
             <SourceChart data={bySource ?? []} />
           )}
@@ -83,14 +83,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Staff Win / Loss">
           {winLossLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>
+            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
           ) : (
             <StaffWinLossChart data={winLossData ?? []} />
           )}
         </Card>
         <Card title="Staff Win Rate">
           {winLossLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>
+            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
           ) : (
             <StaffWinRateChart data={winLossData ?? []} />
           )}

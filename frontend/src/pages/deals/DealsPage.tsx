@@ -66,7 +66,6 @@ export default function DealsPage() {
       </div>
     )},
     { key: "value", title: "Value", render: (deal: Deal) => `QAR ${deal.value.toLocaleString()}` },
-    { key: "commissionAmount", title: "Commission", render: (deal: Deal) => deal.commissionAmount ? `QAR ${deal.commissionAmount.toLocaleString()}` : "-" },
     {
       key: "status",
       title: "Status",
@@ -90,10 +89,10 @@ export default function DealsPage() {
 
   const actions = (deal: Deal) => (
     <div className="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onClick={() => setViewingDeal(deal)}>
+      <Button variant="ghost" size="sm" onClick={() => setViewingDeal(deal)} aria-label="View deal">
         <Eye className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="sm" onClick={() => setEditingDeal(deal)}>
+      <Button variant="ghost" size="sm" onClick={() => setEditingDeal(deal)} aria-label="Edit deal">
         <Pencil className="h-4 w-4" />
       </Button>
       <Button
@@ -104,6 +103,7 @@ export default function DealsPage() {
             deleteMutation.mutate(deal.id);
           }
         }}
+        aria-label="Delete deal"
       >
         <Trash2 className="h-4 w-4 text-red-600" />
       </Button>
@@ -235,6 +235,7 @@ function CreateDealModal({ clients, users, onClose }: { clients: any[]; users: a
     { value: "PROPERTY_FINDER", label: "Property Finder" },
     { value: "MAZAD_ARAB", label: "Mazad Arab" },
     { value: "REFERRAL", label: "Referral" },
+    { value: "WEBSITE", label: "Website" },
   ];
 
   const createMutation = useMutation({
@@ -302,7 +303,7 @@ function CreateDealModal({ clients, users, onClose }: { clients: any[]; users: a
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
           <h2 className="text-lg font-semibold">Add New Deal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {!showNewClient ? (
@@ -418,7 +419,7 @@ function EditDealModal({ deal, onClose }: { deal: Deal; onClose: () => void }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-semibold">Edit Deal</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form
           onSubmit={(e) => {

@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { Repository, DataSource, ILike } from "typeorm";
 import { HttpService } from "@nestjs/axios";
 import { firstValueFrom } from "rxjs";
 import { OfficerndSync } from "./entities/officernd-sync.entity";
@@ -81,12 +81,39 @@ export class OfficerndService {
   // ---------------------------------------------------------------------------
 
   /**
+   * Fetch all companies from OfficeRnD into a map keyed by _id.
+   */
+  private async fetchCompanyMap(token: string): Promise<Map<string, any>> {
+    const map = new Map<string, any>();
+    let url: string | null = `${this.apiBase}/companies?$limit=50`;
+
+    while (url) {
+      const response: any = await firstValueFrom(
+        this.httpService.get(url, { headers: { Authorization: `Bearer ${token}` } }),
+      );
+      const results: any[] = response.data?.results ?? [];
+      const cursorNext: string | null = response.data?.cursorNext ?? null;
+
+      for (const c of results) {
+        map.set(c._id, c);
+      }
+
+      if (!cursorNext) break;
+      url = cursorNext.startsWith("http")
+        ? cursorNext
+        : `${this.apiBase}/companies?$limit=50&$cursorNext=${cursorNext}`;
+    }
+
+    return map;
+  }
+
+  /**
    * Fetch all memberships from OfficeRnD, paginating with cursorNext.
    * Returns the raw membership objects from the API.
    */
   private async fetchMemberships(token: string): Promise<any[]> {
     const all: any[] = [];
-    let url: string | null = `${this.apiBase}/billing/memberships?$limit=50`;
+    let url: string | null = `${this.apiBase}/memberships?$limit=50`;
 
     while (url) {
       const response: any = await firstValueFrom(
@@ -102,10 +129,9 @@ export class OfficerndService {
       all.push(...results);
 
       if (!cursorNext) break;
-      // cursorNext may be a relative path or already contain query params
       url = cursorNext.startsWith("http")
         ? cursorNext
-        : `${this.apiBase}/billing/memberships?$limit=50&$cursorNext=${cursorNext}`;
+        : `${this.apiBase}/memberships?$limit=50&$cursorNext=${cursorNext}`;
     }
 
     return all;
@@ -143,6 +169,9 @@ export class OfficerndService {
 
       const token = this.accessToken!;
 
+      // Fetch companies for name/email enrichment
+      const companyMap = await this.fetchCompanyMap(token);
+
       // Fetch all memberships
       const memberships = await this.fetchMemberships(token);
 
@@ -166,7 +195,7 @@ export class OfficerndService {
         const endDate = new Date(endDateRaw);
         if (endDate < todayStart || endDate > ninetyDays) continue;
 
-        const result = await this.upsertMembership(m);
+        const result = await this.upsertMembership(m, companyMap);
         processed++;
         if (result.created) created++;
         else if (result.updated) updated++;
@@ -194,18 +223,17 @@ export class OfficerndService {
    * - Existing PENDING rows are freely overwritten from upstream data.
    * - Existing non-PENDING rows record upstream changes without overwriting typed columns.
    */
-  private async upsertMembership(membership: any): Promise<{ created: boolean; updated: boolean }> {
-    const membershipId = membership.id || membership._id;
+  private async upsertMembership(membership: any, companyMap: Map<string, any>): Promise<{ created: boolean; updated: boolean }> {
+    const membershipId = membership._id || membership.id;
     const officerndCompanyId = membership.company || membership.companyId || "";
-    const companyName =
-      membership.companyName ||
-      membership.company?.name ||
-      membership.company?.companyName ||
-      "Unknown Company";
-    const contactEmail = membership.contactEmail || membership.member?.email || null;
-    const contactPhone = membership.contactPhone || membership.member?.phone || null;
-    const membershipType =
-      membership.plan?.name || membership.membershipType || membership.resourceName || null;
+
+    // Enrich from company map
+    const company = companyMap.get(officerndCompanyId);
+    const companyName = company?.name || membership.companyName || "Unknown Company";
+    const contactEmail = company?.email || membership.contactEmail || null;
+    const contactPhone = company?.address?.phone || null;
+
+    const membershipType = membership.name || membership.membershipType || null;
     const membershipValue = membership.price ?? membership.value ?? null;
     const endDate = membership.endDate || membership.end_date;
     const officerndData = membership;
@@ -296,29 +324,28 @@ export class OfficerndService {
 
   async getExpiringCompanies(query: QueryOfficerndSyncDto) {
     const { page = 1, limit = 20, status, search } = query;
-    const qb = this.syncRepo
-      .createQueryBuilder("s")
-      .leftJoinAndSelect("s.assignedUser", "u")
-      .leftJoinAndSelect("s.client", "c")
-      .leftJoinAndSelect("s.deal", "d");
 
-    if (status) {
-      qb.andWhere("s.status = :status", { status });
-    }
+    const where: any[] = [];
+    if (status) where.push({ status });
     if (search) {
-      qb.andWhere(
-        "(s.company_name ILIKE :search OR s.contact_email ILIKE :search OR s.contact_phone ILIKE :search)",
-        { search: `%${search}%` },
+      where.push(
+        { companyName: ILike(`%${search}%`), ...(status ? { status } : {}) },
+        { contactEmail: ILike(`%${search}%`), ...(status ? { status } : {}) },
+        { contactPhone: ILike(`%${search}%`), ...(status ? { status } : {}) },
       );
     }
 
-    const total = await qb.getCount();
-    const data = await qb
-      .orderBy("s.end_date", "ASC")
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
+    const findOptions: any = {
+      relations: ["assignedUser", "client", "deal"],
+      order: { endDate: "ASC" },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+    if (where.length > 0) {
+      findOptions.where = search ? where : { status };
+    }
 
+    const [data, total] = await this.syncRepo.findAndCount(findOptions);
     return { data, total, page, limit };
   }
 

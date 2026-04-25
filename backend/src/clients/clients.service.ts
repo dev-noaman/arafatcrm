@@ -43,11 +43,11 @@ export class ClientsService {
     const { page, limit } = pagination;
 
     if (userRole === "SALES" && userId) {
-      // SALES sees their own clients + unassigned legacy clients (created_by IS NULL)
+      // SALES sees only their own clients
       const qb = this.clientsRepo.createQueryBuilder("client")
         .leftJoinAndSelect("client.assignedTo", "assignedTo")
         .leftJoinAndSelect("client.createdBy", "createdBy")
-        .where("client.created_by = :userId OR client.created_by IS NULL", { userId })
+        .where("client.created_by = :userId", { userId })
         .orderBy("client.createdAt", "DESC")
         .skip((page - 1) * limit)
         .take(limit);
@@ -77,8 +77,8 @@ export class ClientsService {
       throw new NotFoundException(`Client with ID ${id} not found`);
     }
 
-    // SALES users can see their own clients + unassigned legacy clients (createdById is null)
-    if (userRole === "SALES" && userId && client.createdBy?.id !== userId && client.createdById !== null) {
+    // SALES users can only see their own clients
+    if (userRole === "SALES" && userId && client.createdById !== userId) {
       throw new NotFoundException(`Client with ID ${id} not found`);
     }
 

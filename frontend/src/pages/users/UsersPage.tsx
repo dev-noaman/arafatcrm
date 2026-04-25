@@ -81,7 +81,7 @@ function BulkUploadModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Bulk Add Users</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close">
             &#x2715;
           </button>
         </div>
@@ -233,13 +233,15 @@ export default function UsersPage() {
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
                       <button
                         onClick={() => setEditingUser({ id: user.id, email: user.email, name: user.name || "", role: user.role })}
-                        className="text-blue-600 hover:text-blue-800 mr-3"
+                        className="text-blue-600 hover:text-blue-800 mr-3 focus:outline-none focus:ring-2 focus:ring-blue-300 rounded"
+                        aria-label="Edit user"
                       >
                         <Edit2 className="h-4 w-4 inline" /> Edit
                       </button>
                       <button
                         onClick={() => handleDelete(user.id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-300 rounded"
+                        aria-label="Delete user"
                       >
                         <Trash2 className="h-4 w-4 inline" /> Delete
                       </button>

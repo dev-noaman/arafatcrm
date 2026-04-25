@@ -17,6 +17,7 @@ const CLIENT_SOURCES = [
   { value: "PROPERTY_FINDER", label: "Property Finder" },
   { value: "MAZAD_ARAB", label: "Mazad Arab" },
   { value: "REFERRAL", label: "Referral" },
+  { value: "WEBSITE", label: "Website" },
 ];
 
 const sourceVariants: Record<string, "default" | "info" | "success" | "warning"> = {
@@ -70,12 +71,12 @@ export default function ClientsPage() {
 
   const actions = (client: Client) => (
     <div className="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onClick={() => setViewClient(client)}>
+      <Button variant="ghost" size="sm" onClick={() => setViewClient(client)} aria-label="View client">
         <Eye className="h-4 w-4" />
       </Button>
       {isAdmin && (
         <>
-          <Button variant="ghost" size="sm" onClick={() => setEditClient(client)}>
+          <Button variant="ghost" size="sm" onClick={() => setEditClient(client)} aria-label="Edit client">
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
@@ -86,6 +87,7 @@ export default function ClientsPage() {
                 deleteMutation.mutate(client.id);
               }
             }}
+            aria-label="Delete client"
           >
             <Trash2 className="h-4 w-4 text-red-600" />
           </Button>
@@ -260,7 +262,7 @@ function ViewClientModal({ client, onClose }: { client: Client; onClose: () => v
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">{current.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -318,7 +320,7 @@ function EditClientModal({ client, onClose }: { client: Client; onClose: () => v
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">Edit Client</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <Input label="Name *" value={formData.name} onChange={(e: any) => setFormData({ ...formData, name: e.target.value })} required />
@@ -426,7 +428,7 @@ function BulkClientModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">Bulk Import Clients</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
           {/* Info + Template */}

@@ -59,7 +59,7 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-lg border bg-white", className)}>
+    <div className={cn("overflow-x-auto rounded-lg border bg-white", className)}>
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
@@ -76,7 +76,7 @@ export function DataTable<T extends { id: string }>({
                 <div className="flex items-center gap-1">
                   {column.title}
                   {sortKey === column.key && (
-                    <span className="text-gray-400">{sortDir === "asc" ? "↑" : "↓"}</span>
+                    <span className="text-gray-500">{sortDir === "asc" ? "↑" : "↓"}</span>
                   )}
                 </div>
               </th>

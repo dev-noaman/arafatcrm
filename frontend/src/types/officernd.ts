@@ -15,6 +15,7 @@ export interface OfficerndSyncItem {
   dealId: string | null;
   upstreamChanges: Record<string, { old: any; new: any }> | null;
   upstreamChangedAt: string | null;
+  officerndData: Record<string, any> | null;
   syncedAt: string;
   createdAt: string;
   updatedAt: string;

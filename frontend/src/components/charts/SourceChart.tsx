@@ -16,6 +16,7 @@ const SOURCE_LABELS: Record<string, string> = {
   MAZAD_ARAB: "Mazad Arab",
   REFERRAL: "Referral",
   BROKER: "Broker",
+  WEBSITE: "Website",
 };
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -29,10 +30,11 @@ const SOURCE_COLORS: Record<string, string> = {
   MAZAD_ARAB: "#8B5CF6",
   REFERRAL: "#22C55E",
   BROKER: "#EAB308",
+  WEBSITE: "#6366F1",
 };
 
 export default function SourceChart({ data }: Props) {
-  if (!data.length) return <div className="flex items-center justify-center h-[350px] text-gray-400">No data available</div>;
+  if (!data.length) return <div className="flex items-center justify-center h-[350px] text-gray-500">No data available</div>;
 
   const totals = data.map((d) => d.won + d.lost);
 
@@ -45,7 +47,7 @@ export default function SourceChart({ data }: Props) {
         chart: { type: "donut" },
         colors: data.map((d) => SOURCE_COLORS[d.source] || "#6B7280"),
         labels: data.map((d) => SOURCE_LABELS[d.source] || d.source),
-        dataLabels: { enabled: true, style: { fontSize: "12px" } },
+        dataLabels: { enabled: true, style: { fontSize: "12px", colors: ["#fff"] }, dropShadow: { enabled: false } },
         plotOptions: {
           pie: {
             donut: {

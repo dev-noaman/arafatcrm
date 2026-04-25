@@ -13,11 +13,15 @@ export class ReportsService {
     @InjectRepository(Broker) private brokersRepo: Repository<Broker>,
   ) {}
 
-  async getWinLossReport() {
+  async getWinLossReport(userId?: string, userRole?: string) {
     const users = await this.usersRepo.find();
     const userMap = new Map(users.map((u) => [u.id, u.name || u.email]));
 
-    const allDeals = await this.dealsRepo.find({ relations: ["owner"] });
+    const findOptions: any = { relations: ["owner"] };
+    if (userRole === "SALES" && userId) {
+      findOptions.where = { owner: { id: userId } };
+    }
+    const allDeals = await this.dealsRepo.find(findOptions);
 
     const report = new Map<string, { userName: string; won: number; lost: number; wonValue: number; lostValue: number }>();
 
@@ -48,9 +52,13 @@ export class ReportsService {
     }));
   }
 
-  async getDealPipeline() {
+  async getDealPipeline(userId?: string, userRole?: string) {
+    const where: any = { isLost: false };
+    if (userRole === "SALES" && userId) {
+      where.owner = { id: userId };
+    }
     const deals = await this.dealsRepo.find({
-      where: { isLost: false },
+      where,
       relations: ["client", "broker", "owner"],
       order: { stage: "ASC" },
     });
@@ -80,7 +88,7 @@ export class ReportsService {
     }));
   }
 
-  async getBrokerPerformance(month?: string) {
+  async getBrokerPerformance(month?: string, userId?: string, userRole?: string) {
     const brokers = await this.brokersRepo.find();
     const brokerMap = new Map(brokers.map((b) => [b.id, b.name]));
 
@@ -92,10 +100,17 @@ export class ReportsService {
       dateFilter = { createdAt: Between(start, end) };
     }
 
-    const deals = await this.dealsRepo.find({
+    const findOptions: any = {
       where: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
       relations: ["broker"],
-    });
+    };
+
+    if (userRole === "SALES" && userId) {
+      const existingWhere = findOptions.where || {};
+      findOptions.where = { ...existingWhere, owner: { id: userId } };
+    }
+
+    const deals = await this.dealsRepo.find(findOptions);
 
     const byBroker = new Map<string, { totalDeals: number; won: number; lost: number; active: number; totalValue: number; totalCommission: number }>();
 
@@ -184,7 +199,7 @@ export class ReportsService {
     }));
   }
 
-  async getSpaceTypeBreakdown(month?: string) {
+  async getSpaceTypeBreakdown(month?: string, userId?: string, userRole?: string) {
     let dateFilter: any = {};
     if (month) {
       const [year, m] = month.split("-").map(Number);
@@ -193,9 +208,16 @@ export class ReportsService {
       dateFilter = { createdAt: Between(start, end) };
     }
 
-    const deals = await this.dealsRepo.find({
+    const findOptions: any = {
       where: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
-    });
+    };
+
+    if (userRole === "SALES" && userId) {
+      const existingWhere = findOptions.where || {};
+      findOptions.where = { ...existingWhere, owner: { id: userId } };
+    }
+
+    const deals = await this.dealsRepo.find(findOptions);
 
     const bySpace = new Map<string, { count: number; totalValue: number; won: number; lost: number }>();
     for (const deal of deals) {

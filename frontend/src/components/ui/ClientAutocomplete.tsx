@@ -105,7 +105,8 @@ export function ClientAutocomplete({ clients, value, onChange, onNewClient, labe
           <button
             type="button"
             onClick={handleClear}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 p-0.5"
+            className="flex-shrink-0 text-gray-400 hover:text-gray-600 p-0.5 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded"
+            aria-label="Clear"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />

@@ -6,3 +6,4 @@ export * from "./DataTable";
 export * from "./Select";
 export * from "./PhoneInput";
 export * from "./ClientAutocomplete";
+export * from "./Modal";

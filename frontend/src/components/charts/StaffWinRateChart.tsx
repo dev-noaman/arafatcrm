@@ -6,7 +6,7 @@ interface Props {
 }
 
 export default function StaffWinRateChart({ data }: Props) {
-  if (!data.length) return <div className="flex items-center justify-center h-[350px] text-gray-400">No data available</div>;
+  if (!data.length) return <div className="flex items-center justify-center h-[350px] text-gray-500">No data available</div>;
 
   return (
     <ApexChart

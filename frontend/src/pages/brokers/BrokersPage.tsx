@@ -89,11 +89,11 @@ export default function BrokersPage() {
 
   const actions = (broker: Broker) => (
     <div className="flex justify-end gap-2">
-      <Button variant="ghost" size="sm" onClick={() => setViewBroker(broker)}>
+      <Button variant="ghost" size="sm" onClick={() => setViewBroker(broker)} aria-label="View broker">
         <Eye className="h-4 w-4" />
       </Button>
       {isAdmin && (
-        <Button variant="ghost" size="sm" onClick={() => setEditBroker(broker)}>
+        <Button variant="ghost" size="sm" onClick={() => setEditBroker(broker)} aria-label="Edit broker">
           <Pencil className="h-4 w-4" />
         </Button>
       )}
@@ -104,6 +104,7 @@ export default function BrokersPage() {
           onClick={() => {
             if (confirm(`Delete broker ${broker.name}?`)) deleteMutation.mutate(broker.id);
           }}
+          aria-label="Delete broker"
         >
           <Trash2 className="h-4 w-4 text-red-600" />
         </Button>
@@ -203,7 +204,7 @@ function CreateBrokerModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">Add New Broker</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <Input label="Name *" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
@@ -291,7 +292,7 @@ function ViewBrokerModal({ broker, onClose, isAdmin }: { broker: Broker; onClose
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">{current.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-6">
           {/* Info Grid */}
@@ -462,7 +463,7 @@ function EditBrokerModal({ broker, onClose }: { broker: Broker; onClose: () => v
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">Edit Broker</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <Input label="Name *" value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
@@ -615,7 +616,7 @@ function BulkBrokerModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-lg font-semibold">Bulk Import Brokers</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
           {/* Info + Template */}
