@@ -41,4 +41,27 @@ export const dealsApi = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/deals/${id}`);
   },
+
+  scheduleMeeting: async (
+    id: string,
+    data: {
+      meetingDate: string;
+      meetingTime: string;
+      meetingLocation: string;
+      meetingNotes?: string;
+    },
+  ): Promise<Deal> => {
+    const res = await apiClient.post<Deal>(
+      `/deals/${id}/schedule-meeting`,
+      data,
+    );
+    return res.data;
+  },
+
+  cancelMeeting: async (id: string): Promise<Deal> => {
+    const res = await apiClient.delete<Deal>(
+      `/deals/${id}/schedule-meeting`,
+    );
+    return res.data;
+  },
 };

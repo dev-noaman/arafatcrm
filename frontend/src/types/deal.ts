@@ -24,6 +24,12 @@ export interface Deal {
   broker: Broker | null;
   owner: User;
   officerndSyncId?: string | null;
+  meetingDate: string | null;
+  meetingTime: string | null;
+  meetingDuration: number | null;
+  meetingLocation: string | null;
+  meetingNotes: string | null;
+  calendarEventId: string | null;
   stageHistory: string[];
   createdAt: string;
   updatedAt: string;

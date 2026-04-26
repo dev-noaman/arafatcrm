@@ -42,13 +42,14 @@ export type DealStage = (typeof DealStage)[keyof typeof DealStage];
 export const TERMINAL_STAGES: DealStage[] = [DealStage.WON, DealStage.LOST];
 
 export const PIPELINE_STAGES: DealStage[] = [
-  DealStage.LEAD,
   DealStage.NEW,
   DealStage.QUALIFIED,
   DealStage.MEETING,
   DealStage.PROPOSAL,
   DealStage.NEGOTIATION,
   DealStage.CONTRACT,
+  DealStage.WON,
+  DealStage.LOST,
 ];
 
 export const DealLocation = {
