@@ -82,4 +82,23 @@ export class Deal extends BaseEntity {
   @ManyToOne(() => OfficerndSync, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "officernd_sync_id" })
   officerndSync: OfficerndSync | null = null;
+
+  // Meeting / Calendar fields
+  @Column({ type: "date", nullable: true, name: "meeting_date" })
+  meetingDate: string | null = null;
+
+  @Column({ type: "time", nullable: true, name: "meeting_time" })
+  meetingTime: string | null = null;
+
+  @Column({ type: "int", nullable: true, default: 30, name: "meeting_duration" })
+  meetingDuration: number | null = null;
+
+  @Column({ type: "varchar", length: 500, nullable: true, name: "meeting_location" })
+  meetingLocation: string | null = null;
+
+  @Column({ type: "text", nullable: true, name: "meeting_notes" })
+  meetingNotes: string | null = null;
+
+  @Column({ type: "varchar", length: 255, nullable: true, name: "calendar_event_id" })
+  calendarEventId: string | null = null;
 }
