@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/auth";
+import { calendarApi } from "@/api/calendar";
 import { useAuthStore } from "@/contexts/auth-store";
 import { Button, Card } from "@/components/ui";
-import { User, Mail, Lock, Save } from "lucide-react";
+import { User, Mail, Lock, Save, Calendar, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
@@ -22,6 +23,34 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [calendarMsg, setCalendarMsg] = useState("");
+
+  const { data: calendarStatus } = useQuery({
+    queryKey: ["calendar-status"],
+    queryFn: () => calendarApi.getStatus(),
+  });
+
+  // Check for calendar OAuth callback result from URL params
+  useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cal = params.get("calendar");
+    if (cal === "connected") {
+      setCalendarMsg("Google Calendar connected successfully!");
+      window.history.replaceState({}, "", "/profile");
+    } else if (cal === "error") {
+      setCalendarMsg("Failed to connect Google Calendar. Please try again.");
+      window.history.replaceState({}, "", "/profile");
+    }
+  });
+
+  const handleConnectCalendar = async () => {
+    try {
+      const { url } = await calendarApi.getConnectUrl();
+      window.open(url, "_blank");
+    } catch {
+      setCalendarMsg("Failed to start Google Calendar connection.");
+    }
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => authApi.updateProfile(data),
@@ -139,6 +168,33 @@ export default function ProfilePage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
           {success && <p className="text-sm text-emerald-600">{success}</p>}
+
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              <Calendar className="h-4 w-4 inline mr-1 text-gray-400" />
+              Google Calendar
+            </h3>
+            <p className="text-xs text-gray-500">
+              Connect your Google account to automatically create calendar events when scheduling meetings.
+            </p>
+            {calendarMsg && (
+              <p className={`text-sm flex items-center gap-1 ${calendarMsg.includes("success") ? "text-emerald-600" : "text-red-600"}`}>
+                {calendarMsg.includes("success") ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                {calendarMsg}
+              </p>
+            )}
+            {calendarStatus?.connected ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
+                <CheckCircle className="h-4 w-4" />
+                Google Calendar is connected
+              </div>
+            ) : (
+              <Button type="button" variant="secondary" onClick={handleConnectCalendar}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Connect Google Calendar
+              </Button>
+            )}
+          </div>
 
           <div className="flex justify-end pt-2">
             <Button type="submit" isLoading={updateMutation.isPending}>

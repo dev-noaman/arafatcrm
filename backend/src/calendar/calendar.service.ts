@@ -4,24 +4,23 @@ import { Repository } from "typeorm";
 import { google, Auth } from "googleapis";
 import { ConfigService } from "@nestjs/config";
 import { GoogleToken } from "./calendar.entity";
-import { User } from "../users/user.entity";
 
 @Injectable()
 export class CalendarService {
   constructor(
     @InjectRepository(GoogleToken)
     private tokenRepo: Repository<GoogleToken>,
-    @InjectRepository(User)
-    private userRepo: Repository<User>,
     private config: ConfigService,
   ) {}
 
-  getAuthUrl(): string {
+  getAuthUrl(userId: string): string {
     const oauthClient = this.createOAuthClient();
+    const state = Buffer.from(userId).toString("base64");
     return oauthClient.generateAuthUrl({
       access_type: "offline",
       scope: ["https://www.googleapis.com/auth/calendar.events"],
       prompt: "consent",
+      state,
     });
   }
 
@@ -41,12 +40,6 @@ export class CalendarService {
       },
       ["userId"],
     );
-  }
-
-  async handleCallbackAsAdmin(code: string): Promise<void> {
-    const admin = await this.userRepo.findOne({ where: { role: "ADMIN" } });
-    if (!admin) throw new Error("No admin user found");
-    await this.handleCallback(code, admin.id);
   }
 
   async isConnected(userId: string): Promise<boolean> {
