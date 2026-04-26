@@ -4,7 +4,7 @@ import { dealsApi } from "@/api/deals";
 import { clientsApi } from "@/api/clients";
 import { usersApi } from "@/api/users";
 import { brokersApi } from "@/api/brokers";
-import { Button, Select, PhoneInput, ClientAutocomplete } from "@/components/ui";
+import { Button, Select, PhoneInput, ClientAutocomplete, Modal } from "@/components/ui";
 import { useAuthStore } from "@/contexts/auth-store";
 import type { Deal } from "@/types/deal";
 import {
@@ -18,6 +18,7 @@ import {
   X,
   Pencil,
   Trash2,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 
 const PIPELINE_STAGES = [
@@ -49,6 +50,7 @@ function DealCard({
   onClick,
   onWin,
   onLose,
+  onScheduleMeeting,
 }: {
   deal: Deal;
   stageId: string;
@@ -56,6 +58,7 @@ function DealCard({
   onClick: (deal: Deal) => void;
   onWin: (deal: Deal) => void;
   onLose: (deal: Deal) => void;
+  onScheduleMeeting: (deal: Deal) => void;
 }) {
   const isOfficeRnD = !!deal.officerndSyncId;
   const isTerminal = stageId === "won" || stageId === "lost";
@@ -171,6 +174,22 @@ function DealCard({
             </button>
           </div>
         )}
+
+        {stageId === "meeting" && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onScheduleMeeting(deal); }}
+            className="mt-2 w-full text-xs font-medium py-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center justify-center gap-1 min-h-[44px]"
+            aria-label={deal.meetingDate ? "Reschedule meeting" : "Schedule meeting"}
+          >
+            <CalendarIcon className="w-3.5 h-3.5" />
+            {deal.meetingDate ? "Reschedule" : "Schedule Meeting"}
+          </button>
+        )}
+        {stageId === "meeting" && deal.meetingDate && (
+          <div className="mt-1 text-xs text-gray-500">
+            {deal.meetingDate} at {deal.meetingTime} — {deal.meetingLocation}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -186,6 +205,7 @@ function StageColumn({
   onDealClick,
   onWin,
   onLose,
+  onScheduleMeeting,
 }: {
   stage: (typeof PIPELINE_STAGES)[number];
   deals: Deal[];
@@ -196,6 +216,7 @@ function StageColumn({
   onDealClick: (deal: Deal) => void;
   onWin: (deal: Deal) => void;
   onLose: (deal: Deal) => void;
+  onScheduleMeeting: (deal: Deal) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
   const total = deals.reduce((sum, d) => sum + d.value, 0);
@@ -263,7 +284,7 @@ function StageColumn({
           </div>
         ) : deals.length > 0 ? (
           deals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} stageId={stage.id} onDragStart={onDragStart} onClick={onDealClick} onWin={onWin} onLose={onLose} />
+            <DealCard key={deal.id} deal={deal} stageId={stage.id} onDragStart={onDragStart} onClick={onDealClick} onWin={onWin} onLose={onLose} onScheduleMeeting={onScheduleMeeting} />
           ))
         ) : (
           <button
@@ -665,6 +686,128 @@ function Input({ label, ...props }: any) {
   );
 }
 
+function ScheduleMeetingModal({ deal, onClose, onSave }: {
+  deal: Deal;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [date, setDate] = useState(deal.meetingDate ?? "");
+  const [time, setTime] = useState(deal.meetingTime ?? "08:30");
+  const [location, setLocation] = useState(deal.meetingLocation ?? "");
+  const [notes, setNotes] = useState(deal.meetingNotes ?? "");
+
+  // 18 slots: 08:30 to 17:00 (last slot ends at 17:30)
+  const TIME_SLOTS = Array.from({ length: 18 }, (_, i) => {
+    const totalMin = i * 30 + 510; // 510 = 8*60+30
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  });
+
+  const isSundayToThursday = (dateStr: string) => {
+    if (!dateStr) return true;
+    const d = new Date(dateStr);
+    const day = d.getDay(); // 0=Sun, 5=Fri, 6=Sat
+    return day !== 5 && day !== 6;
+  };
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => dealsApi.scheduleMeeting(deal.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pipeline-deals"] });
+      onSave();
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({ meetingDate: date, meetingTime: time, meetingLocation: location, meetingNotes: notes });
+  };
+
+  return (
+    <Modal isOpen={true} onClose={onClose} title={deal.meetingDate ? "Reschedule Meeting" : "Schedule Meeting"}>
+      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <div className="text-sm text-gray-500 mb-2">
+          {deal.client?.name} — {deal.title}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+            className={`w-full border rounded-lg p-2 text-sm ${!isSundayToThursday(date) && date ? "border-red-500" : ""}`}
+          />
+          {!isSundayToThursday(date) && date && (
+            <p className="text-xs text-red-500 mt-1">Working days are Sunday to Thursday</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Time <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            required
+            className="w-full border rounded-lg p-2 text-sm"
+          >
+            {TIME_SLOTS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">30-minute meeting, working hours 08:30–17:30</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Location <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            required
+            maxLength={500}
+            className="w-full border rounded-lg p-2 text-sm"
+            placeholder="Meeting location"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="w-full border rounded-lg p-2 text-sm"
+            rows={3}
+            placeholder="Meeting agenda or notes"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50 min-h-[44px]">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={mutation.isPending || !date || !time || !location || !isSundayToThursday(date)}
+            className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 min-h-[44px]"
+          >
+            {mutation.isPending ? "Saving..." : deal.meetingDate ? "Reschedule" : "Schedule"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function PipelinePage() {
   const queryClient = useQueryClient();
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
@@ -677,6 +820,7 @@ export default function PipelinePage() {
   const [showTerminal, setShowTerminal] = useState(true);
   const [lossDeal, setLossDeal] = useState<Deal | null>(null);
   const [lossReason, setLossReason] = useState("");
+  const [meetingDeal, setMeetingDeal] = useState<Deal | null>(null);
 
   const { data: dealsData, isLoading } = useQuery({
     queryKey: ["deals", "pipeline"],
@@ -937,6 +1081,7 @@ export default function PipelinePage() {
               onDealClick={handleDealClick}
               onWin={handleWin}
               onLose={handleLose}
+              onScheduleMeeting={(deal) => setMeetingDeal(deal)}
             />
           ))}
         </div>
@@ -998,6 +1143,15 @@ export default function PipelinePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Schedule Meeting Modal */}
+      {meetingDeal && (
+        <ScheduleMeetingModal
+          deal={meetingDeal}
+          onClose={() => setMeetingDeal(null)}
+          onSave={() => setMeetingDeal(null)}
+        />
       )}
     </div>
   );
