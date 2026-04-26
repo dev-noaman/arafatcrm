@@ -13,6 +13,12 @@ export interface OfficerndSyncItem {
   assignedUser: { id: string; name: string | null; email: string } | null;
   clientId: string | null;
   dealId: string | null;
+  deal: {
+    id: string;
+    stage: string;
+    status: string;
+    owner: { id: string; name: string | null; email: string } | null;
+  } | null;
   upstreamChanges: Record<string, { old: any; new: any }> | null;
   upstreamChangedAt: string | null;
   officerndData: Record<string, any> | null;

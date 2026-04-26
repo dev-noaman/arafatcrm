@@ -15,8 +15,8 @@ const SOURCE_LABELS: Record<string, string> = {
   PROPERTY_FINDER: "Property Finder",
   MAZAD_ARAB: "Mazad Arab",
   REFERRAL: "Referral",
-  BROKER: "Broker",
   WEBSITE: "Website",
+  OFFICERND_RENEWAL: "OfficeRnD Renewal",
 };
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -29,8 +29,8 @@ const SOURCE_COLORS: Record<string, string> = {
   PROPERTY_FINDER: "#06B6D4",
   MAZAD_ARAB: "#8B5CF6",
   REFERRAL: "#22C55E",
-  BROKER: "#EAB308",
   WEBSITE: "#6366F1",
+  OFFICERND_RENEWAL: "#A855F7",
 };
 
 export default function SourceChart({ data }: Props) {

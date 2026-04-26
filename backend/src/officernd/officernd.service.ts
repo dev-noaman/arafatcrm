@@ -108,6 +108,37 @@ export class OfficerndService {
   }
 
   /**
+   * Fetch all members from OfficeRnD into a map keyed by _id.
+   * Members contain phone numbers that companies don't.
+   */
+  private async fetchMemberMap(token: string): Promise<Map<string, any>> {
+    const map = new Map<string, any>();
+    try {
+      let url: string | null = `${this.apiBase}/members?$limit=50`;
+
+      while (url) {
+        const response: any = await firstValueFrom(
+          this.httpService.get(url, { headers: { Authorization: `Bearer ${token}` } }),
+        );
+        const results: any[] = response.data?.results ?? [];
+        const cursorNext: string | null = response.data?.cursorNext ?? null;
+
+        for (const m of results) {
+          map.set(m._id, m);
+        }
+
+        if (!cursorNext) break;
+        url = cursorNext.startsWith("http")
+          ? cursorNext
+          : `${this.apiBase}/members?$limit=50&$cursorNext=${cursorNext}`;
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to fetch members (scope may be missing): ${err?.message}`);
+    }
+    return map;
+  }
+
+  /**
    * Fetch all memberships from OfficeRnD, paginating with cursorNext.
    * Returns the raw membership objects from the API.
    */
@@ -172,6 +203,9 @@ export class OfficerndService {
       // Fetch companies for name/email enrichment
       const companyMap = await this.fetchCompanyMap(token);
 
+      // Fetch members for phone enrichment
+      const memberMap = await this.fetchMemberMap(token);
+
       // Fetch all memberships
       const memberships = await this.fetchMemberships(token);
 
@@ -195,7 +229,7 @@ export class OfficerndService {
         const endDate = new Date(endDateRaw);
         if (endDate < todayStart || endDate > ninetyDays) continue;
 
-        const result = await this.upsertMembership(m, companyMap);
+        const result = await this.upsertMembership(m, companyMap, memberMap);
         processed++;
         if (result.created) created++;
         else if (result.updated) updated++;
@@ -223,7 +257,7 @@ export class OfficerndService {
    * - Existing PENDING rows are freely overwritten from upstream data.
    * - Existing non-PENDING rows record upstream changes without overwriting typed columns.
    */
-  private async upsertMembership(membership: any, companyMap: Map<string, any>): Promise<{ created: boolean; updated: boolean }> {
+  private async upsertMembership(membership: any, companyMap: Map<string, any>, memberMap: Map<string, any>): Promise<{ created: boolean; updated: boolean }> {
     const membershipId = membership._id || membership.id;
     const officerndCompanyId = membership.company || membership.companyId || "";
 
@@ -231,7 +265,11 @@ export class OfficerndService {
     const company = companyMap.get(officerndCompanyId);
     const companyName = company?.name || membership.companyName || "Unknown Company";
     const contactEmail = company?.email || membership.contactEmail || null;
-    const contactPhone = company?.address?.phone || null;
+
+    // Enrich phone: try member data first (most reliable), then company
+    const memberId = membership.member || membership.memberId || "";
+    const member = memberMap.get(memberId);
+    const contactPhone = member?.phone || member?.mobile || company?.phone || company?.address?.phone || company?.billingAddress?.phone || null;
 
     const membershipType = membership.name || membership.membershipType || null;
     const membershipValue = membership.price ?? membership.value ?? null;
@@ -336,7 +374,7 @@ export class OfficerndService {
     }
 
     const findOptions: any = {
-      relations: ["assignedUser", "client", "deal"],
+      relations: ["assignedUser", "client", "deal", "deal.owner"],
       order: { endDate: "ASC" },
       skip: (page - 1) * limit,
       take: limit,
@@ -415,6 +453,7 @@ export class OfficerndService {
             name: sync.companyName,
             email: sync.contactEmail || `${sync.officerndCompanyId}@officernd.placeholder`,
             phone: sync.contactPhone || "",
+            company: sync.companyName,
             source: "OFFICERND_RENEWAL",
           });
           const saved = await manager.save(client);
