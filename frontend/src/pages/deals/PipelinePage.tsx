@@ -10,10 +10,7 @@ import type { Deal } from "@/types/deal";
 import {
   Plus,
   MoreVertical,
-  Filter,
-  ChevronDown,
   LayoutGrid,
-  Tag,
   TrendingUp,
   DollarSign,
   CheckCircle2,
@@ -30,6 +27,8 @@ const PIPELINE_STAGES = [
   { id: "proposal", label: "Proposal", accent: "#EC4899" },
   { id: "negotiation", label: "Negotiation", accent: "#F97316" },
   { id: "contract", label: "Contract", accent: "#EAB308" },
+  { id: "won", label: "Won", accent: "#22C55E" },
+  { id: "lost", label: "Lost", accent: "#EF4444" },
 ];
 
 function normalizeStage(stage: string): string {
@@ -45,76 +44,132 @@ function formatCompact(value: number): string {
 
 function DealCard({
   deal,
+  stageId,
   onDragStart,
   onClick,
+  onWin,
+  onLose,
 }: {
   deal: Deal;
+  stageId: string;
   onDragStart: (id: string) => void;
   onClick: (deal: Deal) => void;
+  onWin: (deal: Deal) => void;
+  onLose: (deal: Deal) => void;
 }) {
+  const isOfficeRnD = !!deal.officerndSyncId;
+  const isTerminal = stageId === "won" || stageId === "lost";
+
   return (
     <div
-      draggable
+      draggable={!isTerminal}
       onDragStart={() => onDragStart(deal.id)}
       onClick={() => onClick(deal)}
-      className="bg-white rounded-lg border border-gray-200 p-3.5 cursor-grab active:cursor-grabbing hover:border-[#465FFF]/40 hover:shadow-sm transition-all duration-150 group"
+      className={`bg-white rounded-lg p-0 ${isTerminal ? "cursor-default" : "cursor-grab active:cursor-grabbing"} hover:shadow-sm transition-all duration-150 group overflow-hidden ${
+        isOfficeRnD
+          ? "border-2 border-purple-300 hover:border-purple-400"
+          : "border border-gray-200 hover:border-[#465FFF]/40"
+      }`}
     >
-      <div className="flex items-start gap-2 mb-2">
-        <GripVertical className="h-4 w-4 text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-gray-900 text-sm truncate leading-tight">
-            {deal.client?.name || "Unknown"}
-          </h4>
-          <p className="text-xs text-gray-500 truncate mt-0.5">
-            {deal.client?.company || "N/A"}
-          </p>
-          <p className="text-xs text-gray-500 truncate mt-0.5">
-            {{ CLOSED_OFFICE: "Closed Office", ABC_ADDRESS: "Abc Address", ABC_FLEX: "Abc Flex", ABC_ELITE: "Abc Elite", WORKSTATION: "Workstation", OFFICE: "Office" }[deal.spaceType] || deal.spaceType}
-            {deal.location && ` · ${deal.location.replace(/_/g, " ")}`}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-2.5 pl-6">
-        <span className="text-sm font-bold text-gray-900">
-          QAR {deal.value.toLocaleString()}
-        </span>
-        <div className="flex items-center gap-1.5">
-          {deal.officerndSyncId && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">OfficeRnD</span>
-          )}
-          {deal.owner && (
-            <div
-              className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: "#465FFF" }}
-              title={deal.owner.name || deal.owner.email}
-            >
-              {(deal.owner.name || deal.owner.email).charAt(0).toUpperCase()}
-            </div>
+      {isOfficeRnD && (
+        <div className="bg-gradient-to-r from-purple-600 to-purple-500 px-3.5 py-1.5 flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-white tracking-wide uppercase">OfficeRnD Renewal</span>
+          {deal.expectedCloseDate && (
+            <span className="text-[11px] font-medium text-purple-100">
+              by {new Date(deal.expectedCloseDate).toLocaleDateString()}
+            </span>
           )}
         </div>
-      </div>
-
-      {deal.officerndSyncId && deal.expectedCloseDate ? (
-        <div className="pl-6 mt-2">
-          <p className="text-xs text-gray-500">
-            Renewal by: {new Date(deal.expectedCloseDate).toLocaleDateString()}
-          </p>
+      )}
+      <div className="p-3.5">
+        <div className="flex items-start gap-2 mb-2">
+          {!isTerminal && (
+            <GripVertical className="h-4 w-4 text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-gray-900 text-sm truncate leading-tight">
+              {deal.client?.name || "Unknown"}
+            </h4>
+            <p className="text-xs text-gray-500 truncate mt-0.5">
+              {deal.client?.company || "N/A"}
+            </p>
+            <p className="text-xs text-gray-500 truncate mt-0.5">
+              {{ CLOSED_OFFICE: "Closed Office", ABC_ADDRESS: "Abc Address", ABC_FLEX: "Abc Flex", ABC_ELITE: "Abc Elite", WORKSTATION: "Workstation", OFFICE: "Office" }[deal.spaceType] || deal.spaceType}
+              {deal.location && ` · ${deal.location.replace(/_/g, " ")}`}
+            </p>
+          </div>
         </div>
-      ) : deal.expectedCloseDate ? (
-        <div className="pl-6 mt-2">
-          <span className="text-[11px] text-gray-500">
-            Close: {new Date(deal.expectedCloseDate).toLocaleDateString()}
+
+        <div className="flex items-center justify-between mt-2.5 pl-6">
+          <span className="text-sm font-bold text-gray-900">
+            QAR {deal.value.toLocaleString()}
           </span>
+          <div className="flex items-center gap-1.5">
+            {deal.owner && (
+              <div
+                className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                style={{ backgroundColor: "#465FFF" }}
+                title={deal.owner.name || deal.owner.email}
+              >
+                {(deal.owner.name || deal.owner.email).charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
         </div>
-      ) : null}
 
-      <div className="pl-6 mt-2 flex items-center gap-3 text-[11px] text-gray-500">
-        {deal.broker && (
-          <span>Broker: {deal.broker.name}</span>
+        {!isOfficeRnD && deal.expectedCloseDate && (
+          <div className="pl-6 mt-2">
+            <span className="text-[11px] text-gray-500">
+              Close: {new Date(deal.expectedCloseDate).toLocaleDateString()}
+            </span>
+          </div>
         )}
-        {!deal.broker && (
-          <span>Broker: N/A</span>
+
+        <div className="pl-6 mt-2 flex items-center gap-3 text-[11px] text-gray-500">
+          {deal.broker && (
+            <span>Broker: {deal.broker.name}</span>
+          )}
+          {!deal.broker && (
+            <span>Broker: N/A</span>
+          )}
+        </div>
+
+        {stageId === "won" && (
+          <div className="mt-1 pl-6 text-xs font-semibold text-green-700">
+            QAR {deal.value?.toLocaleString()}
+          </div>
+        )}
+
+        {stageId === "lost" && (
+          <div className="mt-1 pl-6">
+            <div className="text-xs font-semibold text-red-700">
+              QAR {deal.value?.toLocaleString()}
+            </div>
+            {deal.lossReason && (
+              <div className="text-xs text-gray-500 mt-0.5 truncate" title={deal.lossReason}>
+                {deal.lossReason}
+              </div>
+            )}
+          </div>
+        )}
+
+        {stageId === "contract" && (
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); onWin(deal); }}
+              className="flex-1 text-xs font-semibold py-1.5 rounded bg-green-500 text-white hover:bg-green-600 min-h-[44px]"
+              aria-label="Mark as Won"
+            >
+              WIN
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onLose(deal); }}
+              className="flex-1 text-xs font-semibold py-1.5 rounded bg-red-500 text-white hover:bg-red-600 min-h-[44px]"
+              aria-label="Mark as Lost"
+            >
+              LOSS
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -129,6 +184,8 @@ function StageColumn({
   onDragStart,
   onAddDeal,
   onDealClick,
+  onWin,
+  onLose,
 }: {
   stage: (typeof PIPELINE_STAGES)[number];
   deals: Deal[];
@@ -137,21 +194,27 @@ function StageColumn({
   onDragStart: (id: string) => void;
   onAddDeal: (stage: string) => void;
   onDealClick: (deal: Deal) => void;
+  onWin: (deal: Deal) => void;
+  onLose: (deal: Deal) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
   const total = deals.reduce((sum, d) => sum + d.value, 0);
+  const isTerminal = stage.id === "won" || stage.id === "lost";
+  const columnBg = stage.id === "won" ? "bg-green-50" : stage.id === "lost" ? "bg-red-50" : "bg-white/60";
 
   return (
     <div
-      className={`flex-1 min-w-0 flex flex-col rounded-xl bg-white/60 p-3 transition-colors duration-150 ${
+      className={`flex-1 min-w-0 flex flex-col rounded-xl ${columnBg} p-3 transition-colors duration-150 ${
         isOver ? "bg-[#465FFF]/5" : ""
       }`}
       onDragOver={(e) => {
+        if (isTerminal) return;
         e.preventDefault();
         setIsOver(true);
       }}
       onDragLeave={() => setIsOver(false)}
       onDrop={(e) => {
+        if (isTerminal) return;
         e.preventDefault();
         setIsOver(false);
         onDrop(stage.id);
@@ -200,7 +263,7 @@ function StageColumn({
           </div>
         ) : deals.length > 0 ? (
           deals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} onDragStart={onDragStart} onClick={onDealClick} />
+            <DealCard key={deal.id} deal={deal} stageId={stage.id} onDragStart={onDragStart} onClick={onDealClick} onWin={onWin} onLose={onLose} />
           ))
         ) : (
           <button
@@ -606,17 +669,28 @@ export default function PipelinePage() {
   const queryClient = useQueryClient();
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState<string>("all");
+  const [filterLocation, setFilterLocation] = useState<string>("all");
+  const [filterTag, setFilterTag] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"value" | "date">("date");
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(true);
+  const [lossDeal, setLossDeal] = useState<Deal | null>(null);
+  const [lossReason, setLossReason] = useState("");
 
   const { data: dealsData, isLoading } = useQuery({
     queryKey: ["deals", "pipeline"],
     queryFn: async () => {
-      const result = await dealsApi.findAll(1, 100, { status: "active" });
-      return result.data.filter(
-        (d) => !d.isLost && d.stage !== "WON" && d.stage !== "LOST"
-      );
+      const [activeRes, wonRes, lostRes] = await Promise.all([
+        dealsApi.findAll(1, 100, { status: "active" }),
+        dealsApi.findAll(1, 100, { status: "won" }),
+        dealsApi.findAll(1, 100, { status: "lost" }),
+      ]);
+      return [
+        ...activeRes.data,
+        ...wonRes.data,
+        ...lostRes.data,
+      ];
     },
   });
 
@@ -670,23 +744,56 @@ export default function PipelinePage() {
     setSelectedDeal(deal);
   };
 
+  const handleWin = (deal: Deal) => {
+    dealsApi.update(deal.id, { stage: "WON", confirmTerminal: true })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["deals", "pipeline"] }));
+  };
+
+  const handleLose = (deal: Deal) => {
+    setLossDeal(deal);
+    setLossReason("");
+  };
+
+  const confirmLose = () => {
+    if (!lossDeal) return;
+    dealsApi.markAsLost(lossDeal.id, lossReason)
+      .then(() => {
+        setLossDeal(null);
+        queryClient.invalidateQueries({ queryKey: ["deals", "pipeline"] });
+      });
+  };
+
   const filteredDeals = useMemo(() => {
     if (!dealsData) return [];
     let deals = dealsData;
     if (filterOwner !== "all") {
       deals = deals.filter((d) => d.owner?.id === filterOwner);
     }
+    if (filterLocation !== "all") {
+      deals = deals.filter((d) => d.location === filterLocation);
+    }
+    if (filterTag !== "all") {
+      if (filterTag === "OFFICERND") {
+        deals = deals.filter((d) => !!d.officerndSyncId);
+      } else {
+        deals = deals.filter((d) => !d.officerndSyncId);
+      }
+    }
     if (sortBy === "value") {
       deals = [...deals].sort((a, b) => b.value - a.value);
     }
     return deals;
-  }, [dealsData, filterOwner, sortBy]);
+  }, [dealsData, filterOwner, filterLocation, filterTag, sortBy]);
 
   const getDealsByStage = (stageId: string) => {
     return filteredDeals.filter(
       (deal) => normalizeStage(deal.stage) === stageId
     );
   };
+
+  const visibleStages = showTerminal
+    ? PIPELINE_STAGES
+    : PIPELINE_STAGES.filter((s) => s.id !== "won" && s.id !== "lost");
 
   const owners = useMemo(() => {
     if (!dealsData) return [];
@@ -733,11 +840,16 @@ export default function PipelinePage() {
 
         {/* Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
-            <Filter className="h-3.5 w-3.5 text-gray-400" />
-            <span>Pipeline</span>
-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-          </div>
+          <select
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 appearance-none cursor-pointer hover:bg-gray-100 transition-colors"
+          >
+            <option value="all">All Locations</option>
+            <option value="BARWA_ALSADD">Barwa Alsadd</option>
+            <option value="ELEMENT_WESTBAY">Element Westbay</option>
+            <option value="MARINA50_LUSAIL">Marina 50 Lusail</option>
+          </select>
 
           <select
             value={filterOwner}
@@ -752,11 +864,15 @@ export default function PipelinePage() {
             ))}
           </select>
 
-          <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
-            <Tag className="h-3.5 w-3.5 text-gray-400" />
-            <span>Tag</span>
-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-          </div>
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 appearance-none cursor-pointer hover:bg-gray-100 transition-colors"
+          >
+            <option value="all">All Deals</option>
+            <option value="OFFICERND">OfficeRnD Renewal</option>
+            <option value="REGULAR">Regular</option>
+          </select>
 
           <select
             value={sortBy}
@@ -766,6 +882,14 @@ export default function PipelinePage() {
             <option value="date">Newest first</option>
             <option value="value">Highest value</option>
           </select>
+
+          <button
+            onClick={() => setShowTerminal(!showTerminal)}
+            className={`text-xs px-2 py-1 rounded border ${showTerminal ? "bg-gray-100" : ""}`}
+            aria-label={showTerminal ? "Hide Won/Lost columns" : "Show Won/Lost columns"}
+          >
+            {showTerminal ? "Hide" : "Show"} Won/Lost
+          </button>
         </div>
       </div>
 
@@ -801,7 +925,7 @@ export default function PipelinePage() {
       {/* Kanban Board */}
       <div data-pipeline-board className="flex-1 bg-gray-50 overflow-hidden min-h-0 flex flex-col">
         <div className="flex gap-3 p-4 flex-1 min-h-0 overflow-hidden">
-          {PIPELINE_STAGES.map((stage) => (
+          {visibleStages.map((stage) => (
             <StageColumn
               key={stage.id}
               stage={stage}
@@ -811,6 +935,8 @@ export default function PipelinePage() {
               onDragStart={handleDragStart}
               onAddDeal={handleAddDeal}
               onDealClick={handleDealClick}
+              onWin={handleWin}
+              onLose={handleLose}
             />
           ))}
         </div>
@@ -828,6 +954,50 @@ export default function PipelinePage() {
           users={usersData || []}
           onClose={() => setShowCreateModal(false)}
         />
+      )}
+
+      {/* Loss Reason Modal */}
+      {lossDeal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setLossDeal(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold">Mark as Lost</h2>
+              <button onClick={() => setLossDeal(null)} className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300 rounded" aria-label="Close"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Mark <strong>{lossDeal.title}</strong> as lost?
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={lossReason}
+                  onChange={(e) => setLossReason(e.target.value)}
+                  className="w-full border rounded-lg p-2 text-sm"
+                  rows={3}
+                  placeholder="Why was this deal lost?"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setLossDeal(null)}
+                  className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50 min-h-[44px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLose}
+                  disabled={!lossReason.trim()}
+                  className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 min-h-[44px]"
+                >
+                  Mark as Lost
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
