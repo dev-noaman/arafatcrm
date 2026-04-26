@@ -17,6 +17,7 @@ import { DealsService } from "./deals.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MarkLostDto } from "./dto/mark-lost.dto";
+import { ScheduleMeetingDto } from "./dto/schedule-meeting.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 
 import { User, Roles } from "../common/decorators";
@@ -61,6 +62,26 @@ export class DealsController {
     @User() user: any,
   ) {
     return this.dealsService.markAsLost(id, dto.reason, user.id, user.role);
+  }
+
+  @Post(":id/schedule-meeting")
+  @ApiOperation({ summary: "Schedule a meeting for a deal" })
+  @HttpCode(HttpStatus.OK)
+  scheduleMeeting(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ScheduleMeetingDto,
+    @User() user: any,
+  ) {
+    return this.dealsService.scheduleMeeting(id, dto, user.id, user.role);
+  }
+
+  @Delete(":id/schedule-meeting")
+  @ApiOperation({ summary: "Cancel a scheduled meeting" })
+  cancelMeeting(
+    @Param("id", ParseUUIDPipe) id: string,
+    @User() user: any,
+  ) {
+    return this.dealsService.cancelMeeting(id, user.id, user.role);
   }
 
   @Delete(":id")

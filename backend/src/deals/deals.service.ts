@@ -10,15 +10,18 @@ import { Deal } from "./deal.entity";
 import { User } from "../users/user.entity";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
+import { ScheduleMeetingDto } from "./dto/schedule-meeting.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { TERMINAL_STAGES, DealStatus, DealStage } from "@arafat/shared";
 import { AppException } from "../common/exceptions";
+import { CalendarService } from "../calendar/calendar.service";
 
 @Injectable()
 export class DealsService {
   constructor(
     @InjectRepository(Deal)
     private dealsRepo: Repository<Deal>,
+    private calendarService: CalendarService,
   ) {}
 
   async create(dto: CreateDealDto, userId: string, userRole: string) {
@@ -227,5 +230,79 @@ export class DealsService {
       relations: ["client", "broker", "owner"],
       order: { createdAt: "DESC" },
     });
+  }
+
+  async scheduleMeeting(
+    id: string,
+    dto: ScheduleMeetingDto,
+    userId: string,
+    userRole: string,
+  ) {
+    const deal = await this.findOne(id, userId, userRole);
+    if (deal.owner.id !== userId && userRole !== "ADMIN") {
+      throw new ForbiddenException("Only deal owner or admin can schedule meetings");
+    }
+
+    deal.meetingDate = dto.meetingDate;
+    deal.meetingTime = dto.meetingTime;
+    deal.meetingDuration = 30;
+    deal.meetingLocation = dto.meetingLocation;
+    deal.meetingNotes = dto.meetingNotes ?? null;
+
+    try {
+      const clientName = deal.client?.name ?? "Unknown Client";
+      const title = `Meeting: ${clientName} - ${deal.title}`;
+      const startDate = new Date(`${dto.meetingDate}T${dto.meetingTime}:00`);
+      const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
+
+      if (deal.calendarEventId) {
+        await this.calendarService.updateEvent(userId, deal.calendarEventId, {
+          title,
+          start: startDate,
+          end: endDate,
+          location: dto.meetingLocation,
+          description: dto.meetingNotes,
+        });
+      } else {
+        const eventId = await this.calendarService.createEvent(userId, {
+          title,
+          start: startDate,
+          end: endDate,
+          location: dto.meetingLocation,
+          description: dto.meetingNotes,
+        });
+        if (eventId) {
+          deal.calendarEventId = eventId;
+        }
+      }
+    } catch {
+      // Calendar not connected or error — meeting still saved locally
+    }
+
+    return this.dealsRepo.save(deal);
+  }
+
+  async cancelMeeting(id: string, userId: string, userRole: string) {
+    const deal = await this.findOne(id, userId, userRole);
+    if (deal.owner.id !== userId && userRole !== "ADMIN") {
+      throw new ForbiddenException("Only deal owner or admin can cancel meetings");
+    }
+
+    if (deal.calendarEventId) {
+      try {
+        await this.calendarService.deleteEvent(userId, deal.calendarEventId);
+      } catch {
+        // Calendar error — still clear locally
+      }
+    }
+
+    deal.meetingDate = null;
+    deal.meetingTime = null;
+    deal.meetingDuration = null;
+    deal.meetingLocation = null;
+    deal.meetingNotes = null;
+    deal.calendarEventId = null;
+
+    return this.dealsRepo.save(deal);
   }
 }
