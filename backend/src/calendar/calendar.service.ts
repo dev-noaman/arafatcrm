@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { google } from "googleapis";
+import { google, Auth } from "googleapis";
 import { ConfigService } from "@nestjs/config";
 import { GoogleToken } from "./calendar.entity";
 import { User } from "../users/user.entity";
@@ -54,7 +54,7 @@ export class CalendarService {
     return count > 0;
   }
 
-  async getAuthClient(userId: string) {
+  async getAuthClient(userId: string): Promise<Auth.OAuth2Client | null> {
     const tokenRow = await this.tokenRepo.findOne({ where: { userId } });
     if (!tokenRow) return null;
 
