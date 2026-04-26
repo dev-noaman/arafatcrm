@@ -11,7 +11,7 @@ import { User } from "../users/user.entity";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
-import { TERMINAL_STAGES, DealStatus } from "@arafat/shared";
+import { TERMINAL_STAGES, DealStatus, DealStage } from "@arafat/shared";
 import { AppException } from "../common/exceptions";
 
 @Injectable()
@@ -164,6 +164,10 @@ export class DealsService {
     deal.isLost = true;
     deal.lossReason = reason;
     deal.status = DealStatus.LOST;
+    deal.stage = DealStage.LOST;
+    if (!deal.stageHistory.includes(DealStage.LOST)) {
+      deal.stageHistory = [...deal.stageHistory, DealStage.LOST];
+    }
 
     return this.dealsRepo.save(deal);
   }
