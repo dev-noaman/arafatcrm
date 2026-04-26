@@ -4,6 +4,7 @@ import { dealsApi } from "@/api/deals";
 import { clientsApi } from "@/api/clients";
 import { usersApi } from "@/api/users";
 import { brokersApi } from "@/api/brokers";
+import { calendarApi } from "@/api/calendar";
 import { Button, Select, PhoneInput, ClientAutocomplete, Modal } from "@/components/ui";
 import { useAuthStore } from "@/contexts/auth-store";
 import type { Deal } from "@/types/deal";
@@ -19,6 +20,7 @@ import {
   Pencil,
   Trash2,
   Calendar as CalendarIcon,
+  AlertCircle,
 } from "lucide-react";
 
 const PIPELINE_STAGES = [
@@ -858,6 +860,11 @@ export default function PipelinePage() {
     enabled: currentUser?.role === "ADMIN",
   });
 
+  const { data: calendarStatus } = useQuery({
+    queryKey: ["calendar-status"],
+    queryFn: () => calendarApi.getStatus(),
+  });
+
   const updateStageMutation = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) =>
       dealsApi.update(id, { stage }),
@@ -1063,6 +1070,12 @@ export default function PipelinePage() {
               {stats.total} deals
             </span>
           </div>
+          {calendarStatus && !calendarStatus.connected && (
+            <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Google Calendar not connected
+            </div>
+          )}
         </div>
       </div>
 
