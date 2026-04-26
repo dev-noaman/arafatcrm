@@ -53,13 +53,14 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `users/` - User management (admin-only CRUD)
 - `clients/` - Client records with bulk import, SALES role scoped to own clients only (`created_by = userId`), create auto-sets `createdBy`
 - `brokers/` - Broker management with contract dates, broker type (Personal/Corporate), document uploads (QID, CR, TL, Computer Card, Others), `broker-document.entity.ts` for file attachments with CASCADE delete, `broker-upload.helper.ts` for Multer config (10MB, PDF/JPEG/PNG/WebP), bulk import
-- `deals/` - Deal pipeline with stage transitions, phone field, ownerId assignment, default stage "NEW"
+- `deals/` - Deal pipeline with stage transitions, phone field, ownerId assignment, default stage "NEW". Meeting scheduling via `POST /deals/:id/schedule-meeting` and `DELETE /deals/:id/schedule-meeting`. Mark-as-lost sets both `status=lost` and `stage=LOST`.
 - `todos/` - Todo list CRUD scoped by userId
 - `dashboard/` - Stats and analytics
 - `reports/` - Overall staff summary (with month filter, win/lost rates), staff win/loss + win rate charts, location/source charts, pipeline stage chart, broker performance (with month filter), space type breakdown
 - `data-sources/` - Dynamic data sources CRUD (backend only, frontend uses hardcoded list)
 - `officernd/` - OfficeRnD membership sync (cron every 30 min at :07/:37 Asia/Qatar), triage with assign/bulk-send-to-pipeline, `officernd_sync` entity (per-membership rows with PENDING→ASSIGNED→PIPELINED→IGNORED lifecycle), `officernd_sync_runs` entity (sync history), all endpoints admin-only via `@Roles(Role.ADMIN)`. Sync service never touches deals after initial push — only flags `upstreamChanges` diff for non-PENDING rows. Client auto-create uses source `OFFICERND_RENEWAL` with email dedup. Background sync uses `@nestjs/schedule` + `@nestjs/axios`. Pipeline deals from OfficeRnD have `officerndSyncId` FK set.
 - `mail/` - SMTP email via `@nestjs-modules/mailer` + `nodemailer`
+- `calendar/` - Google Calendar integration with per-user OAuth2 (`googleapis` package). `GoogleToken` entity stores per-user tokens in `google_tokens` table. `GET /calendar/connect` returns OAuth URL (any authenticated user). `GET /calendar/oauth/callback` is `@Public()` — handles Google redirect, stores token for the user encoded in `state` param. `GET /calendar/status` returns connection status. Calendar events include `timeZone: "Asia/Qatar"`.
 
 ### Frontend Stack
 - **React 18** + **Vite 5** + **TypeScript**
@@ -67,6 +68,7 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - **Zustand** for auth state, **TanStack Query** for data fetching
 - **React Router v6** for routing
 - **ApexCharts** (react-apexcharts) for charts with distinct per-source colors
+- **lucide-react** for icons (Calendar, AlertCircle, etc.)
 - **html2pdf.js** for PDF export
 - UI template: TailAdmin (customized with `@theme` directives in `tailadmin.css`)
 
@@ -74,12 +76,12 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `/dashboard` - Dashboard with stats, LocationChart, SourceChart (distinct colors), StaffWinLossChart, StaffWinRateChart
 - `/clients` - Client CRUD with phone (Qatar +974), source dropdown, assign-to, view/edit modals, bulk import (CSV upload + template download)
 - `/brokers` - Broker CRUD with contract dates, type (Personal/Corporate), document upload/download, active status toggle, view/edit modals, bulk import (CSV upload + template download)
-- `/pipeline` - Kanban board (6 stages: New → Contract), deal detail modal with full inline editing (title, value, stage, phone, broker, location, space type, sales rep, expected close, notes), drag-and-drop stage changes
+- `/pipeline` - Kanban board (8 stages: New → Contract + Won + Lost). Contract cards have WIN/LOSS buttons (WIN sets `stage=WON`, LOSS opens reason modal then sets `stage=LOST`). Won column (green) and Lost column (red) are toggleable. Meeting-stage cards have Schedule/Reschedule button that opens a date/time picker (Sun-Thu, 08:30-17:30, 30-min slots). Deal detail modal with full inline editing, drag-and-drop stage changes.
 - `/deals` - Deal table with filters, client autocomplete, inline new client creation, Sales Rep and Broker columns
 - `/reports` - Overall staff summary (month filter, win/lost rates), staff win/loss + win rate charts, location/source charts (ApexCharts), space type breakdown, pipeline stage table, broker performance (month filter), PDF export
 - `/users` - User management (admin-only)
 - `/officernd` - OfficeRnD renewal triage (admin-only): table of expiring memberships, inline assign-to dropdown, bulk send-to-pipeline, status tabs (default=PENDING), upstream change flags, sync-now button
-- `/profile` - Edit name, email, change password
+- `/profile` - Edit name, email, change password, connect Google Calendar (per-user OAuth2)
 
 ### Key Components
 - `PhoneInput` - Qatar +974 phone with flag SVG, configurable `maxDigits` (6 for deals, 8 for clients/brokers)
@@ -131,6 +133,9 @@ OFFICERND_CLIENT_ID=...
 OFFICERND_CLIENT_SECRET=...
 OFFICERND_GRANT_TYPE=client_credentials
 OFFICERND_SCOPE=flex.community.memberships.read flex.community.companies.read
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=https://arafatcrm.cloud/api/v1/calendar/oauth/callback
 ```
 
 ## Environment Setup
@@ -162,7 +167,7 @@ pnpm dev
 3. **Terminal stage transitions**: Require `confirmTerminal: true` in update DTO
 4. **Stage updates auto-set status**: Setting stage to "WON" sets status to "won"
 5. **Tailwind CSS v4 uses PostCSS**: Must use `@tailwindcss/postcss` in `postcss.config.js` — do NOT use `@tailwindcss/vite` (it fails to generate utility classes in this pnpm monorepo). Do NOT use `autoprefixer` (v4 handles it internally). All config is in `tailadmin.css` via `@theme` — no `tailwind.config.js` needed.
-6. **Pipeline stages**: The kanban board shows 6 stages: New, Qualified, Meeting, Proposal, Negotiation, Contract (defined in `PipelinePage.tsx` `PIPELINE_STAGES`). New deals default to stage "NEW".
+6. **Pipeline stages**: The kanban board shows 8 stages: New, Qualified, Meeting, Proposal, Negotiation, Contract, Won, Lost (defined in `PipelinePage.tsx` `PIPELINE_STAGES`). The shared `PIPELINE_STAGES` constant in `packages/shared/src/enums.ts` also lists all 8 (no LEAD). New deals default to stage "NEW". Won/Lost columns are toggleable via a "Hide/Show Won/Lost" button.
 7. **Role checks**: Always compare against `"ADMIN"` (uppercase), never `"admin"`.
 8. **Client sources are hardcoded**: Frontend uses a static `CLIENT_SOURCES` / `SOURCES` array in components, not the data-sources API. The `data-sources` backend module exists but is not used in the frontend.
 9. **Deal phone vs client phone**: Deal phone uses `maxDigits={6}`, client/broker phone uses `maxDigits={8}`.
@@ -173,17 +178,24 @@ pnpm dev
 14. **Upload serving**: Backend uses `@nestjs/serve-static` at `/uploads`; frontend proxies `/uploads` to backend via Vite config.
 15. **Frontend .env**: `VITE_API_URL=/api/v1` (uses Vite proxy, not direct backend URL). Backend runs on port 3001.
 16. **Bulk import CSV templates**: Brokers: `Name,Email,Phone,Company,BrokerType,ContractFrom,ContractTo`. Clients: `Name,Email,Phone,Company,Source`. Auto-strips header row if detected.
-17. **Source chart colors**: Each client source has a distinct brand color (MZAD=pink, Facebook=blue, Google=red, Instagram=purple, TikTok=teal, YouTube=orange, PropertyFinder=cyan, MazadArab=violet, Referral=green, Broker=amber, Website=indigo).
+17. **Source chart colors**: Each client source has a distinct brand color (MZAD=pink, Facebook=blue, Google=red, Instagram=purple, TikTok=teal, YouTube=orange, PropertyFinder=cyan, MazadArab=violet, Referral=green, Website=indigo, OfficeRnD Renewal=purple).
 18. **SALES client scoping**: SALES users only see clients they created (`created_by = userId` filter in service). No legacy null fallback. Creating a client auto-sets `createdBy`. Edit/delete buttons hidden for SALES in frontend.
 19. **VPS deployment**: Use `Deploy-to-VPS.ps1` — first run with `-Init` flag, subsequent runs without for updates. VPS at `72.62.189.36`, domain `arafatcrm.cloud`, PM2 process name `arafatcrm-api`, nginx reverse proxy, entry point `dist/src/main.js`.
+31. **SSL/HTTPS**: Let's Encrypt cert via certbot nginx plugin. Cert covers `arafatcrm.cloud` only — `www.arafatcrm.cloud` has no DNS A record so it's excluded. Cert auto-renews via certbot systemd timer. If cert is missing, run: `certbot --nginx -d arafatcrm.cloud --non-interactive --agree-tos --email info@arafatcrm.cloud --redirect`. Certbot and nginx plugin are already installed on the VPS.
 20. **PM2 env caching**: PM2 caches environment variables from first start — must `pm2 delete` and recreate (not just restart) to clear cached env vars like `CORS_ORIGIN`.
 21. **PM2 ecosystem config**: Use `/var/www/arafatcrm/ecosystem.config.js` with `cwd: "/var/www/arafatcrm/backend"` so NestJS `ConfigModule` finds `.env`. Always `pm2 start ecosystem.config.js` instead of `pm2 start dist/src/main.js` directly — otherwise `.env` is not loaded (PM2 doesn't read `.env` files; NestJS reads `.env` from cwd).
 22. **`multer` dependency**: Must be in `backend/package.json` dependencies (not just `@types/multer`). The deploy script wipes `node_modules` on each deploy, so `pnpm install` must find it in `package.json`.
 23. **OfficeRnD sync overwrite policy**: PENDING rows are overwritten freely on re-sync. ASSIGNED/IGNORED/PIPELINED rows are NOT overwritten — incoming diffs are stored in `upstreamChanges` jsonb with `upstreamChangedAt` timestamp. Admin must acknowledge to apply changes. The sync service never touches deals after the initial pipeline push.
-24. **OfficeRnD client auto-create**: When sending to pipeline, dedup by email or phone. If `contactEmail` is null, generate `{officerndCompanyId}@officernd.placeholder` to avoid unique constraint collision.
+24. **OfficeRnD client auto-create**: When sending to pipeline, dedup by email or phone. If `contactEmail` is null, generate `{officerndCompanyId}@officernd.placeholder` to avoid unique constraint collision. Both `name` and `company` fields are set to `sync.companyName`. Phone is extracted from `company.phone`, `company.address.phone`, or `company.billingAddress.phone` — but often unavailable from OfficeRnD API with our OAuth scope.
 25. **OfficeRnD deal defaults**: Renewal deals get `location="BARWA_ALSADD"`, `spaceType="CLOSED_OFFICE"`, `stage="NEW"`, no broker, no commission. Admin can change these in the pipeline.
-26. **OfficeRnD pipeline cards**: Deals with `officerndSyncId` set render with a purple "OfficeRnD" badge and show renewal date in the pipeline kanban.
+26. **OfficeRnD pipeline cards**: Deals with `officerndSyncId` set render with a prominent purple gradient header banner ("OfficeRnD Renewal" + renewal date), purple border, and no inline badge. Regular cards have no banner.
 27. **Circular entity import**: `deal.entity.ts` imports `OfficerndSync` and `officernd-sync.entity.ts` imports `Deal`. TypeORM handles this via lazy `() => Entity` syntax — both entities use this pattern.
 28. **OfficeRnD API endpoints**: Memberships at `/api/v2/organizations/{slug}/memberships`, companies at `/api/v2/organizations/{slug}/companies`. Both use `$limit=50` max and `cursorNext` pagination. No `$expand` support — company/member IDs must be resolved separately. Membership fields: `_id`, `company` (ID), `name`, `price`, `endDate`, `member` (ID). Company fields: `_id`, `name`, `email`, `address`. The ID field is `_id` (not `id`).
 29. **OfficeRnD data enrichment**: Memberships only contain a company ID reference. The sync service fetches all companies into a `Map<id, company>` first, then enriches each membership with `companyName` and `contactEmail` from that map. No member endpoint available with our OAuth scope.
 30. **OfficeRnD query method**: Use `findAndCount` with `relations: ["assignedUser", "client", "deal"]` — NOT `createQueryBuilder` with `leftJoinAndSelect`. The QueryBuilder approach fails at runtime with `TypeError: Cannot read properties of undefined (reading 'databaseName')` in production.
+32. **Calendar per-user OAuth**: Each staff member connects their own Google account via the Profile page (`/profile`). OAuth `state` param carries base64-encoded userId so the callback (`@Public()` endpoint) knows which user to store the token for. `GET /calendar/connect` is available to any authenticated user (not admin-only). `GoogleToken` entity uses `upsert` on `userId` — reconnecting replaces the old token.
+33. **Meeting scheduling**: Deals in the Meeting stage have `meetingDate`, `meetingTime`, `meetingDuration` (fixed 30 min), `meetingLocation`, `meetingNotes`, and `calendarEventId` columns. `POST /deals/:id/schedule-meeting` saves locally AND creates/updates a Google Calendar event if the user has connected their account. Calendar errors are caught silently — meeting data always saves locally even without Google connection.
+34. **Calendar event timezone**: All Google Calendar events use `timeZone: "Asia/Qatar"` (UTC+3, no DST). Meeting time slots are 08:30–17:00 Sunday–Thursday.
+35. **markAsLost sets stage**: The `markAsLost` service method sets both `status = "lost"` AND `stage = "LOST"` (plus appends to `stageHistory`). Without the stage update, lost deals won't appear in the pipeline Lost column.
+36. **Pipeline data fetching**: The pipeline board fetches deals with all three statuses (`active`, `won`, `lost`) via `Promise.all` and buckets them client-side into 8 columns. Won/Lost deals are NOT filtered out.
+37. **`googleapis` type annotation**: `CalendarService.getAuthClient()` must have explicit return type `Promise<Auth.OAuth2Client | null>` to avoid TS2742 ("inferred type cannot be named without reference to google-auth-library").
