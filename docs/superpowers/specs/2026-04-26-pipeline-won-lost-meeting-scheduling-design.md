@@ -46,9 +46,10 @@ Two enhancements to the pipeline kanban board:
 - Won and Lost columns are filterable — can be toggled visible/hidden to manage board width
 - Default: both visible
 
-### Backend Impact
+### Backend Changes Required
 
-- No backend changes needed for this feature — the existing stage transition logic (`confirmTerminal` guard, auto status update, `mark-lost` endpoint) handles everything.
+- **Fix `markAsLost` method** — Current `POST /deals/:id/mark-lost` sets `status = "lost"` and `isLost = true` but does NOT set `stage = "LOST"`. Must add `deal.stage = DealStage.LOST` and append to `stageHistory` so the card appears in the Lost column.
+- **Frontend data fetching** — Current pipeline query fetches only `status: "active"` and filters out `stage !== "WON" && stage !== "LOST"`. Must change to fetch all deals (active + won + lost) and bucket them into the 8 columns client-side.
 
 ---
 
@@ -109,10 +110,10 @@ GOOGLE_REDIRECT_URI=https://arafatcrm.cloud/api/v1/calendar/oauth/callback
 
 ### Calendar Module Structure
 
-**calendar.controller.ts:**
-- `GET /calendar/connect` — initiates OAuth flow
-- `GET /calendar/oauth/callback` — handles OAuth redirect, stores tokens
-- `GET /calendar/status` — returns whether current user has Google connected
+**calendar.controller.ts** (all paths prefixed with `/api/v1` via global prefix):
+- `GET /calendar/connect` — requires `JwtAuthGuard`. Returns `{ url: "<google-oauth-url>" }` so the frontend can redirect the browser. Frontend opens this URL in a new tab/window.
+- `GET /calendar/oauth/callback` — public endpoint (no JWT). Handles Google redirect, exchanges code for tokens, stores them, redirects to frontend settings page with success/error query param.
+- `GET /calendar/status` — requires `JwtAuthGuard`. Returns `{ connected: boolean }`.
 
 **calendar.service.ts:**
 - `getAuthClient(userId)` — builds authenticated Google API client, handles token refresh
@@ -122,6 +123,32 @@ GOOGLE_REDIRECT_URI=https://arafatcrm.cloud/api/v1/calendar/oauth/callback
 
 **calendar.entity.ts:**
 - `GoogleToken` entity for `google_tokens` table
+
+### Meeting Scheduling API
+
+**Endpoint:** `POST /deals/:id/schedule-meeting`
+**Auth:** `JwtAuthGuard` (any authenticated user can schedule)
+**DTO (`ScheduleMeetingDto`):**
+- `meetingDate` — date string (required)
+- `meetingTime` — time string HH:mm (required)
+- `meetingLocation` — string, max 500 chars (required)
+- `meetingNotes` — string, optional
+
+**Behavior:**
+1. Validates the deal exists and the user is the owner or admin
+2. Saves meeting fields to the deal entity
+3. If Google Calendar is connected for this user, creates/updates calendar event
+4. Returns updated deal
+
+**Endpoint:** `DELETE /deals/:id/schedule-meeting`
+**Auth:** `JwtAuthGuard`
+**Behavior:** Clears meeting fields, cancels Google Calendar event if `calendarEventId` exists.
+
+### Role Restrictions
+
+- **Meeting scheduling:** Any authenticated user who is the deal owner or an admin
+- **Google Calendar connect:** Admin only (`@Roles(Role.ADMIN)`). Single org-wide Google account — all scheduled meetings go to one calendar.
+- **Google Calendar status:** Any authenticated user
 
 ### Event Details
 
@@ -150,7 +177,7 @@ Access tokens expire (~1 hour). The service checks expiry before each API call a
 |--------|------|----------|---------|---------|
 | `meeting_date` | date | yes | null | Scheduled meeting date |
 | `meeting_time` | time | yes | null | Scheduled meeting time |
-| `meeting_duration` | int | yes | 30 | Duration in minutes |
+| `meeting_duration` | int | yes | 30 | Duration in minutes (fixed 30, column for future flexibility) |
 | `meeting_location` | varchar(500) | yes | null | Custom meeting location |
 | `meeting_notes` | text | yes | null | Meeting agenda/notes |
 | `calendar_event_id` | varchar(255) | yes | null | Google Calendar event ID |
@@ -159,8 +186,8 @@ Access tokens expire (~1 hour). The service checks expiry before each API call a
 
 | Column | Type | Purpose |
 |--------|------|---------|
-| `id` | serial PK | Auto ID |
-| `user_id` | int FK → users | Which user's token |
+| `id` | uuid PK | Auto-generated UUID |
+| `user_id` | uuid FK → users | Which user's token |
 | `access_token` | text | Google access token |
 | `refresh_token` | text | Google refresh token |
 | `token_expiry` | timestamp | When access token expires |
@@ -174,7 +201,7 @@ Single TypeORM migration adding all columns and the new table.
 
 ### Shared Package
 
-No enum changes needed — `DealStage.WON`, `DealStage.LOST`, `DealStatus.won`, `DealStatus.lost` already exist.
+No new enums needed — `DealStage.WON`, `DealStage.LOST`, `DealStatus.won`, `DealStatus.lost` already exist. However, the `PIPELINE_STAGES` constant in `packages/shared/src/enums.ts` currently excludes WON and LOST. Update it to include all 8 stages so consumers have a single source of truth. The frontend `PipelinePage.tsx` has its own hardcoded array that will also be updated to 8 stages.
 
 ---
 
@@ -190,24 +217,23 @@ No enum changes needed — `DealStage.WON`, `DealStage.LOST`, `DealStatus.won`, 
 - `backend/src/calendar/calendar.controller.ts`
 - `backend/src/calendar/calendar.service.ts`
 - `backend/src/calendar/calendar.entity.ts`
-- `backend/src/calendar/dto/schedule-meeting.dto.ts`
-- `backend/src/deals/dto/schedule-meeting.dto.ts` (for meeting fields on deal update)
+- `backend/src/deals/dto/schedule-meeting.dto.ts` — DTO for `POST /deals/:id/schedule-meeting`
 
 ### Backend — Modify
 - `backend/src/deals/deal.entity.ts` — add 6 meeting columns
-- `backend/src/deals/deals.service.ts` — add meeting scheduling logic + calendar event creation
-- `backend/src/deals/deals.controller.ts` — add schedule-meeting endpoint
+- `backend/src/deals/deals.service.ts` — fix `markAsLost` to set `stage = "LOST"`, add meeting scheduling logic + calendar event creation/deletion
+- `backend/src/deals/deals.controller.ts` — add `POST /deals/:id/schedule-meeting` and `DELETE /deals/:id/schedule-meeting` endpoints
 - `backend/src/app.module.ts` — import CalendarModule
 - `backend/package.json` — add `googleapis` dependency
 
 ### Frontend — Modify
-- `frontend/src/pages/deals/PipelinePage.tsx` — add Won/Lost columns, WIN/LOSS buttons on Contract cards, Schedule Meeting modal on Meeting cards
-- `frontend/src/api/deals.ts` — add schedule meeting API call
+- `frontend/src/pages/deals/PipelinePage.tsx` — add Won/Lost columns, WIN/LOSS buttons on Contract cards, Schedule Meeting modal on Meeting cards, update data fetching to include won/lost deals
+- `frontend/src/api/deals.ts` — add schedule/delete meeting API calls
 - `frontend/src/api/calendar.ts` — new calendar API client (connect, status)
 - `frontend/src/types/deal.ts` — add meeting fields to Deal type
 
 ### Shared
-- No changes needed
+- `packages/shared/src/enums.ts` — update `PIPELINE_STAGES` to include all 8 stages
 
 ---
 
@@ -219,3 +245,5 @@ No enum changes needed — `DealStage.WON`, `DealStage.LOST`, `DealStatus.won`, 
 - Multiple meetings per deal
 - Drag-and-drop into Won/Lost columns (use buttons only)
 - Retrospective calendar event creation after Google connection
+- Token encryption at rest (v1 stores plain text; encrypt in future iteration)
+- Cancelling Google Calendar event when deal moves out of Meeting stage (event stays on calendar unless manually deleted via `DELETE /deals/:id/schedule-meeting`)
