@@ -21,6 +21,7 @@ import {
   Trash2,
   Calendar as CalendarIcon,
   AlertCircle,
+  Copy,
 } from "lucide-react";
 
 const PIPELINE_STAGES = [
@@ -45,6 +46,38 @@ function formatCompact(value: number): string {
   return `QAR ${value}`;
 }
 
+function CopyBookingLinkButton({ dealId }: { dealId: string }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const { url } = await calendarApi.generateBookingLink(dealId);
+      await navigator.clipboard.writeText(url);
+      setStatus("copied");
+      setTimeout(() => setStatus("idle"), 2000);
+    } catch {
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 2000);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className="w-full text-xs font-medium py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center justify-center gap-1 min-h-[44px]"
+      aria-label="Copy booking link"
+    >
+      <Copy className="w-3.5 h-3.5" />
+      {status === "copied"
+        ? "Copied!"
+        : status === "error"
+        ? "Failed"
+        : "Copy Booking Link"}
+    </button>
+  );
+}
+
 function DealCard({
   deal,
   stageId,
@@ -53,6 +86,7 @@ function DealCard({
   onWin,
   onLose,
   onScheduleMeeting,
+  calendarStatus,
 }: {
   deal: Deal;
   stageId: string;
@@ -61,6 +95,7 @@ function DealCard({
   onWin: (deal: Deal) => void;
   onLose: (deal: Deal) => void;
   onScheduleMeeting: (deal: Deal) => void;
+  calendarStatus?: { connected: boolean } | null;
 }) {
   const isOfficeRnD = !!deal.officerndSyncId;
   const isTerminal = stageId === "won" || stageId === "lost";
@@ -178,14 +213,19 @@ function DealCard({
         )}
 
         {stageId === "meeting" && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onScheduleMeeting(deal); }}
-            className="mt-2 w-full text-xs font-medium py-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center justify-center gap-1 min-h-[44px]"
-            aria-label={deal.meetingDate ? "Reschedule meeting" : "Schedule meeting"}
-          >
-            <CalendarIcon className="w-3.5 h-3.5" />
-            {deal.meetingDate ? "Reschedule" : "Schedule Meeting"}
-          </button>
+          <div className="mt-2 space-y-1.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); onScheduleMeeting(deal); }}
+              className="w-full text-xs font-medium py-1.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 flex items-center justify-center gap-1 min-h-[44px]"
+              aria-label={deal.meetingDate ? "Reschedule meeting" : "Schedule meeting"}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              {deal.meetingDate ? "Reschedule" : "Schedule Meeting"}
+            </button>
+            {calendarStatus?.connected && (
+              <CopyBookingLinkButton dealId={deal.id} />
+            )}
+          </div>
         )}
         {stageId === "meeting" && deal.meetingDate && (
           <div className="mt-1 text-xs text-gray-500">
@@ -208,6 +248,7 @@ function StageColumn({
   onWin,
   onLose,
   onScheduleMeeting,
+  calendarStatus,
 }: {
   stage: (typeof PIPELINE_STAGES)[number];
   deals: Deal[];
@@ -219,6 +260,7 @@ function StageColumn({
   onWin: (deal: Deal) => void;
   onLose: (deal: Deal) => void;
   onScheduleMeeting: (deal: Deal) => void;
+  calendarStatus?: { connected: boolean } | null;
 }) {
   const [isOver, setIsOver] = useState(false);
   const total = deals.reduce((sum, d) => sum + d.value, 0);
@@ -286,7 +328,7 @@ function StageColumn({
           </div>
         ) : deals.length > 0 ? (
           deals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} stageId={stage.id} onDragStart={onDragStart} onClick={onDealClick} onWin={onWin} onLose={onLose} onScheduleMeeting={onScheduleMeeting} />
+            <DealCard key={deal.id} deal={deal} stageId={stage.id} onDragStart={onDragStart} onClick={onDealClick} onWin={onWin} onLose={onLose} onScheduleMeeting={onScheduleMeeting} calendarStatus={calendarStatus} />
           ))
         ) : (
           <button
@@ -1073,7 +1115,7 @@ export default function PipelinePage() {
           {calendarStatus && !calendarStatus.connected && (
             <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
               <AlertCircle className="w-3.5 h-3.5" />
-              Google Calendar not connected
+              TidyCal not connected
             </div>
           )}
         </div>
@@ -1095,6 +1137,7 @@ export default function PipelinePage() {
               onWin={handleWin}
               onLose={handleLose}
               onScheduleMeeting={(deal) => setMeetingDeal(deal)}
+              calendarStatus={calendarStatus}
             />
           ))}
         </div>
