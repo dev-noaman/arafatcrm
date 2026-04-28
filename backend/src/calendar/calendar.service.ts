@@ -86,7 +86,7 @@ export class CalendarService {
       throw new BadRequestException(`TidyCal token exchange failed: ${body}`);
     }
 
-    const tokenData = await tokenRes.json();
+    const tokenData: any = await tokenRes.json();
     const accessToken: string = tokenData.access_token;
     const refreshToken: string = tokenData.refresh_token;
     const expiresIn: number = tokenData.expires_in ?? 3600;
@@ -100,7 +100,7 @@ export class CalendarService {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (meRes.ok) {
-        const me = await meRes.json();
+        const me: any = await meRes.json();
         username = me.username ?? me.data?.username ?? null;
       }
     } catch (e) {
@@ -178,7 +178,7 @@ export class CalendarService {
         throw new Error(`Refresh failed: ${res.status}`);
       }
 
-      const data = await res.json();
+      const data: any = await res.json();
       token.accessToken = data.access_token;
       token.refreshToken = data.refresh_token ?? token.refreshToken;
       token.tokenExpiry = new Date(Date.now() + (data.expires_in ?? 3600) * 1000);
@@ -210,7 +210,7 @@ export class CalendarService {
       throw new Error(`Failed to fetch booking types: ${res.status}`);
     }
 
-    const data = await res.json();
+    const data: any = await res.json();
     // Adjust parsing based on actual TidyCal response shape
     const items = Array.isArray(data) ? data : data.data ?? [];
     return items.map((t: any) => ({
@@ -279,7 +279,7 @@ export class CalendarService {
         throw new Error(`TidyCal createBooking failed: ${res.status} ${body}`);
       }
 
-      const data = await res.json();
+      const data: any = await res.json();
       return String(data.id ?? data.data?.id ?? "");
     } catch (e) {
       this.logger.error("createBooking failed", e);
