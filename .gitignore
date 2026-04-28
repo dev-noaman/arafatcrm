@@ -40,3 +40,6 @@ tailadmin-react-pro-222.zip
 # coverage
 coverage/
 .nyc_output/
+
+# worktrees
+.worktrees/
