@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
@@ -18,6 +19,8 @@ import { CalendarService } from "../calendar/calendar.service";
 
 @Injectable()
 export class DealsService {
+  private readonly logger = new Logger(DealsService.name);
+
   constructor(
     @InjectRepository(Deal)
     private dealsRepo: Repository<Deal>,
@@ -256,7 +259,7 @@ export class DealsService {
       const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
 
       if (deal.calendarEventId) {
-        await this.calendarService.updateEvent(userId, deal.calendarEventId, {
+        await this.calendarService.updateBooking(userId, deal.calendarEventId, {
           title,
           start: startDate,
           end: endDate,
@@ -264,19 +267,22 @@ export class DealsService {
           description: dto.meetingNotes,
         });
       } else {
-        const eventId = await this.calendarService.createEvent(userId, {
+        const bookingId = await this.calendarService.createBooking(userId, {
           title,
           start: startDate,
           end: endDate,
           location: dto.meetingLocation,
           description: dto.meetingNotes,
+          clientEmail: deal.client?.email,
+          clientName: deal.client?.name,
         });
-        if (eventId) {
-          deal.calendarEventId = eventId;
+        if (bookingId) {
+          deal.calendarEventId = bookingId;
         }
       }
-    } catch {
-      // Calendar not connected or error — meeting still saved locally
+    } catch (e) {
+      this.logger.error("Calendar booking failed", e);
+      // Meeting still saved locally
     }
 
     return this.dealsRepo.save(deal);
@@ -290,9 +296,10 @@ export class DealsService {
 
     if (deal.calendarEventId) {
       try {
-        await this.calendarService.deleteEvent(userId, deal.calendarEventId);
-      } catch {
-        // Calendar error — still clear locally
+        await this.calendarService.cancelBooking(userId, deal.calendarEventId);
+      } catch (e) {
+        this.logger.error("Calendar cancel failed", e);
+        // Still clear locally
       }
     }
 

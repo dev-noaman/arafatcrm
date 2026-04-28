@@ -1,75 +1,247 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { google, Auth } from "googleapis";
 import { ConfigService } from "@nestjs/config";
-import { GoogleToken } from "./calendar.entity";
+import { createHmac } from "crypto";
+import { TidyCalToken } from "./calendar.entity";
 
 @Injectable()
 export class CalendarService {
+  private readonly logger = new Logger(CalendarService.name);
+  private readonly apiBase = "https://tidycal.com/api/v1";
+
   constructor(
-    @InjectRepository(GoogleToken)
-    private tokenRepo: Repository<GoogleToken>,
+    @InjectRepository(TidyCalToken)
+    private tokenRepo: Repository<TidyCalToken>,
     private config: ConfigService,
   ) {}
 
+  // ------------------------------------------------------------------
+  // OAuth helpers
+  // ------------------------------------------------------------------
+
   getAuthUrl(userId: string): string {
-    const oauthClient = this.createOAuthClient();
-    const state = Buffer.from(userId).toString("base64");
-    return oauthClient.generateAuthUrl({
-      access_type: "offline",
-      scope: ["https://www.googleapis.com/auth/calendar.events"],
-      prompt: "consent",
+    const clientId = this.config.get<string>("TIDYCAL_CLIENT_ID");
+    const redirectUri = this.config.get<string>("TIDYCAL_REDIRECT_URI");
+    const state = this.signState(userId);
+
+    const params = new URLSearchParams({
+      client_id: clientId!,
+      redirect_uri: redirectUri!,
+      response_type: "code",
+      scope: "read write",
       state,
     });
+
+    return `https://tidycal.com/oauth/authorize?${params.toString()}`;
   }
 
-  async handleCallback(code: string, userId: string): Promise<void> {
-    const oauthClient = this.createOAuthClient();
-    const { tokens } = await oauthClient.getToken(code);
-    if (!tokens.refresh_token || !tokens.access_token) {
-      throw new Error("Google OAuth did not return required tokens");
+  private signState(userId: string): string {
+    const secret = this.config.get<string>("JWT_SECRET")!;
+    const hmac = createHmac("sha256", secret).update(userId).digest("base64url");
+    return Buffer.from(`${userId}:${hmac}`).toString("base64url");
+  }
+
+  private verifyState(state: string): string | null {
+    try {
+      const decoded = Buffer.from(state, "base64url").toString("utf8");
+      const [userId, signature] = decoded.split(":");
+      if (!userId || !signature) return null;
+      const expected = this.signState(userId);
+      if (state !== expected) return null;
+      return userId;
+    } catch {
+      return null;
     }
+  }
+
+  // ------------------------------------------------------------------
+  // OAuth callback
+  // ------------------------------------------------------------------
+
+  async handleCallback(code: string, state: string): Promise<void> {
+    const userId = this.verifyState(state);
+    if (!userId) {
+      throw new BadRequestException("Invalid OAuth state");
+    }
+
+    const clientId = this.config.get<string>("TIDYCAL_CLIENT_ID");
+    const clientSecret = this.config.get<string>("TIDYCAL_CLIENT_SECRET");
+    const redirectUri = this.config.get<string>("TIDYCAL_REDIRECT_URI");
+
+    const tokenRes = await fetch("https://tidycal.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        code,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text().catch(() => "unknown");
+      throw new BadRequestException(`TidyCal token exchange failed: ${body}`);
+    }
+
+    const tokenData: any = await tokenRes.json();
+    const accessToken: string = tokenData.access_token;
+    const refreshToken: string = tokenData.refresh_token;
+    const expiresIn: number = tokenData.expires_in ?? 3600;
+
+    const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+
+    // Fetch user profile for username
+    let username: string | null = null;
+    try {
+      const meRes = await fetch(`${this.apiBase}/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (meRes.ok) {
+        const me: any = await meRes.json();
+        username = me.username ?? me.data?.username ?? null;
+      }
+    } catch (e) {
+      this.logger.error("Failed to fetch TidyCal profile", e);
+    }
+
+    // Fetch booking types and default to first one
+    let bookingTypeId: string | null = null;
+    let bookingTypeSlug: string | null = null;
+    try {
+      const types = await this.fetchBookingTypesRaw(accessToken);
+      if (types.length > 0) {
+        bookingTypeId = String(types[0].id);
+        bookingTypeSlug = types[0].slug ?? null;
+      }
+    } catch (e) {
+      this.logger.error("Failed to fetch TidyCal booking types", e);
+    }
+
     await this.tokenRepo.upsert(
       {
         userId,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiry: new Date(tokens.expiry_date!),
-        scope: tokens.scope ?? undefined,
+        accessToken,
+        refreshToken,
+        tokenExpiry,
+        username,
+        bookingTypeId,
+        bookingTypeSlug,
       },
       ["userId"],
     );
   }
+
+  // ------------------------------------------------------------------
+  // Connection status
+  // ------------------------------------------------------------------
 
   async isConnected(userId: string): Promise<boolean> {
     const count = await this.tokenRepo.count({ where: { userId } });
     return count > 0;
   }
 
-  async getAuthClient(userId: string): Promise<Auth.OAuth2Client | null> {
-    const tokenRow = await this.tokenRepo.findOne({ where: { userId } });
-    if (!tokenRow) return null;
-
-    const oauthClient = this.createOAuthClient();
-    oauthClient.setCredentials({
-      access_token: tokenRow.accessToken,
-      refresh_token: tokenRow.refreshToken,
-      expiry_date: tokenRow.tokenExpiry.getTime(),
-    });
-
-    if (tokenRow.tokenExpiry <= new Date()) {
-      const { credentials } = await oauthClient.refreshAccessToken();
-      tokenRow.accessToken = credentials.access_token!;
-      tokenRow.tokenExpiry = new Date(credentials.expiry_date!);
-      await this.tokenRepo.save(tokenRow);
-      oauthClient.setCredentials(credentials);
-    }
-
-    return oauthClient;
+  async disconnect(userId: string): Promise<void> {
+    await this.tokenRepo.delete({ userId });
   }
 
-  async createEvent(
+  // ------------------------------------------------------------------
+  // Token management
+  // ------------------------------------------------------------------
+
+  private async getValidToken(userId: string): Promise<TidyCalToken | null> {
+    const token = await this.tokenRepo.findOne({ where: { userId } });
+    if (!token) return null;
+
+    // Token still valid
+    if (token.tokenExpiry > new Date()) return token;
+
+    // Refresh
+    const clientId = this.config.get<string>("TIDYCAL_CLIENT_ID");
+    const clientSecret = this.config.get<string>("TIDYCAL_CLIENT_SECRET");
+
+    try {
+      const res = await fetch("https://tidycal.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: token.refreshToken,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Refresh failed: ${res.status}`);
+      }
+
+      const data: any = await res.json();
+      token.accessToken = data.access_token;
+      token.refreshToken = data.refresh_token ?? token.refreshToken;
+      token.tokenExpiry = new Date(Date.now() + (data.expires_in ?? 3600) * 1000);
+      await this.tokenRepo.save(token);
+      return token;
+    } catch (e) {
+      this.logger.error(`Token refresh failed for user ${userId}`, e);
+      await this.tokenRepo.delete(token.id);
+      return null;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Booking types
+  // ------------------------------------------------------------------
+
+  async getBookingTypes(userId: string): Promise<{ id: string; name: string; slug: string }[]> {
+    const token = await this.getValidToken(userId);
+    if (!token) return [];
+    return this.fetchBookingTypesRaw(token.accessToken);
+  }
+
+  private async fetchBookingTypesRaw(accessToken: string): Promise<{ id: string; name: string; slug: string }[]> {
+    const res = await fetch(`${this.apiBase}/booking-types`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch booking types: ${res.status}`);
+    }
+
+    const data: any = await res.json();
+    // Adjust parsing based on actual TidyCal response shape
+    const items = Array.isArray(data) ? data : data.data ?? [];
+    return items.map((t: any) => ({
+      id: String(t.id),
+      name: t.name ?? "Unnamed",
+      slug: t.slug ?? "",
+    }));
+  }
+
+  async setDefaultBookingType(userId: string, bookingTypeId: string): Promise<void> {
+    const token = await this.getValidToken(userId);
+    if (!token) {
+      throw new BadRequestException("TidyCal not connected");
+    }
+
+    const types = await this.fetchBookingTypesRaw(token.accessToken);
+    const selected = types.find((t) => t.id === bookingTypeId);
+    if (!selected) {
+      throw new BadRequestException("Invalid booking type");
+    }
+
+    token.bookingTypeId = selected.id;
+    token.bookingTypeSlug = selected.slug;
+    await this.tokenRepo.save(token);
+  }
+
+  // ------------------------------------------------------------------
+  // Bookings
+  // ------------------------------------------------------------------
+
+  async createBooking(
     userId: string,
     details: {
       title: string;
@@ -77,34 +249,47 @@ export class CalendarService {
       end: Date;
       location?: string;
       description?: string;
+      clientEmail?: string;
+      clientName?: string;
     },
   ): Promise<string | null> {
-    const auth = await this.getAuthClient(userId);
-    if (!auth) return null;
+    const token = await this.getValidToken(userId);
+    if (!token) return null;
 
-    const calendar = google.calendar({ version: "v3", auth });
-    const event = await calendar.events.insert({
-      calendarId: "primary",
-      requestBody: {
-        summary: details.title,
-        location: details.location,
-        description: details.description,
-        start: {
-          dateTime: details.start.toISOString(),
-          timeZone: "Asia/Qatar",
+    try {
+      const res = await fetch(`${this.apiBase}/bookings`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token.accessToken}`,
+          "Content-Type": "application/json",
         },
-        end: {
-          dateTime: details.end.toISOString(),
-          timeZone: "Asia/Qatar",
-        },
-      },
-    });
-    return event.data.id ?? null;
+        body: JSON.stringify({
+          title: details.title,
+          start: details.start.toISOString(),
+          end: details.end.toISOString(),
+          location: details.location,
+          description: details.description,
+          email: details.clientEmail,
+          name: details.clientName,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "unknown");
+        throw new Error(`TidyCal createBooking failed: ${res.status} ${body}`);
+      }
+
+      const data: any = await res.json();
+      return String(data.id ?? data.data?.id ?? "");
+    } catch (e) {
+      this.logger.error("createBooking failed", e);
+      return null;
+    }
   }
 
-  async updateEvent(
+  async updateBooking(
     userId: string,
-    eventId: string,
+    bookingId: string,
     details: {
       title: string;
       start: Date;
@@ -113,42 +298,72 @@ export class CalendarService {
       description?: string;
     },
   ): Promise<void> {
-    const auth = await this.getAuthClient(userId);
-    if (!auth) return;
+    const token = await this.getValidToken(userId);
+    if (!token) return;
 
-    const calendar = google.calendar({ version: "v3", auth });
-    await calendar.events.update({
-      calendarId: "primary",
-      eventId,
-      requestBody: {
-        summary: details.title,
-        location: details.location,
-        description: details.description,
-        start: {
-          dateTime: details.start.toISOString(),
-          timeZone: "Asia/Qatar",
+    try {
+      const res = await fetch(`${this.apiBase}/bookings/${bookingId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token.accessToken}`,
+          "Content-Type": "application/json",
         },
-        end: {
-          dateTime: details.end.toISOString(),
-          timeZone: "Asia/Qatar",
-        },
-      },
-    });
+        body: JSON.stringify({
+          title: details.title,
+          start: details.start.toISOString(),
+          end: details.end.toISOString(),
+          location: details.location,
+          description: details.description,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "unknown");
+        throw new Error(`TidyCal updateBooking failed: ${res.status} ${body}`);
+      }
+    } catch (e) {
+      this.logger.error("updateBooking failed", e);
+    }
   }
 
-  async deleteEvent(userId: string, eventId: string): Promise<void> {
-    const auth = await this.getAuthClient(userId);
-    if (!auth) return;
+  async cancelBooking(userId: string, bookingId: string): Promise<void> {
+    const token = await this.getValidToken(userId);
+    if (!token) return;
 
-    const calendar = google.calendar({ version: "v3", auth });
-    await calendar.events.delete({ calendarId: "primary", eventId });
+    try {
+      const res = await fetch(`${this.apiBase}/bookings/${bookingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token.accessToken}` },
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "unknown");
+        throw new Error(`TidyCal cancelBooking failed: ${res.status} ${body}`);
+      }
+    } catch (e) {
+      this.logger.error("cancelBooking failed", e);
+    }
   }
 
-  private createOAuthClient() {
-    return new google.auth.OAuth2(
-      this.config.get("GOOGLE_CLIENT_ID"),
-      this.config.get("GOOGLE_CLIENT_SECRET"),
-      this.config.get("GOOGLE_REDIRECT_URI"),
-    );
+  // ------------------------------------------------------------------
+  // Booking link
+  // ------------------------------------------------------------------
+
+  async generateBookingLink(
+    userId: string,
+    clientEmail?: string,
+    clientName?: string,
+  ): Promise<string> {
+    const token = await this.tokenRepo.findOne({ where: { userId } });
+    if (!token?.username || !token?.bookingTypeSlug) {
+      throw new BadRequestException("TidyCal profile not fully configured. Please reconnect.");
+    }
+
+    const params = new URLSearchParams();
+    if (clientEmail) params.set("email", clientEmail);
+    if (clientName) params.set("name", clientName);
+
+    const query = params.toString();
+    return `https://tidycal.com/${token.username}/${token.bookingTypeSlug}${query ? `?${query}` : ""}`;
   }
 }

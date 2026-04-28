@@ -4,10 +4,10 @@ export class AddOfficerndSyncTables1776955388143 implements MigrationInterface {
     name = 'AddOfficerndSyncTables1776955388143'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "todos" DROP CONSTRAINT "todos_user_id_fkey"`);
-        await queryRunner.query(`ALTER TABLE "broker_documents" DROP CONSTRAINT "broker_documents_broker_id_fkey"`);
-        await queryRunner.query(`ALTER TABLE "brokers" DROP CONSTRAINT "brokers_managed_by_id_fkey"`);
-        await queryRunner.query(`ALTER TABLE "deals" DROP CONSTRAINT "FK_deals_client"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "todos" DROP CONSTRAINT IF EXISTS "todos_user_id_fkey"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "broker_documents" DROP CONSTRAINT IF EXISTS "broker_documents_broker_id_fkey"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "brokers" DROP CONSTRAINT IF EXISTS "brokers_managed_by_id_fkey"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "deals" DROP CONSTRAINT IF EXISTS "FK_deals_client"`);
         await queryRunner.query(`CREATE TABLE "officernd_sync" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "officernd_company_id" character varying NOT NULL, "company_name" character varying NOT NULL, "contact_email" character varying, "contact_phone" character varying, "membership_id" character varying NOT NULL, "membership_type" character varying, "membership_value" numeric(15,2), "end_date" date NOT NULL, "officernd_data" jsonb, "status" character varying NOT NULL DEFAULT 'PENDING', "assigned_to" uuid, "client_id" uuid, "deal_id" uuid, "upstream_changes" jsonb, "upstream_changed_at" TIMESTAMP WITH TIME ZONE, "synced_at" TIMESTAMP WITH TIME ZONE NOT NULL, CONSTRAINT "PK_2099eb75ad7af92fc18f51b5b10" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_f27c9367d61021963b81348343" ON "officernd_sync" ("officernd_company_id") `);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_8f2d11a069c700d7f34a03ad58" ON "officernd_sync" ("membership_id") `);
