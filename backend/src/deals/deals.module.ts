@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "../auth/auth.module";
 import { CalendarModule } from "../calendar/calendar.module";
@@ -10,7 +10,11 @@ import { Broker } from "../brokers/broker.entity";
 import { User } from "../users/user.entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Deal, Client, Broker, User]), AuthModule, CalendarModule],
+  imports: [
+    TypeOrmModule.forFeature([Deal, Client, Broker, User]),
+    AuthModule,
+    forwardRef(() => CalendarModule),
+  ],
   providers: [DealsService],
   controllers: [DealsController],
   exports: [DealsService],
