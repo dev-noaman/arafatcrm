@@ -508,6 +508,10 @@ if [ ! -f backend/.env ]; then
     echo "SMTP_USER=emailit" >> backend/.env
     echo "SMTP_PASS=secret_MVseUMO7WC0OLrvQqK2poXdjKU986HWg" >> backend/.env
     echo "SMTP_FROM=info@$VpsDomain" >> backend/.env
+    echo "" >> backend/.env
+    echo "TIDYCAL_CLIENT_ID=${TIDYCAL_CLIENT_ID}" >> backend/.env
+    echo "TIDYCAL_CLIENT_SECRET=${TIDYCAL_CLIENT_SECRET}" >> backend/.env
+    echo "TIDYCAL_REDIRECT_URI=https://$VpsDomain/api/v1/calendar/oauth/callback" >> backend/.env
     echo "Created new backend/.env file"
 else
     echo "backend/.env already exists - preserving configuration"
