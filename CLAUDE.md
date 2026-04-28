@@ -60,7 +60,7 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `data-sources/` - Dynamic data sources CRUD (backend only, frontend uses hardcoded list)
 - `officernd/` - OfficeRnD membership sync (cron every 30 min at :07/:37 Asia/Qatar), triage with assign/bulk-send-to-pipeline, `officernd_sync` entity (per-membership rows with PENDING→ASSIGNED→PIPELINED→IGNORED lifecycle), `officernd_sync_runs` entity (sync history), all endpoints admin-only via `@Roles(Role.ADMIN)`. Sync service never touches deals after initial push — only flags `upstreamChanges` diff for non-PENDING rows. Client auto-create uses source `OFFICERND_RENEWAL` with email dedup. Background sync uses `@nestjs/schedule` + `@nestjs/axios`. Pipeline deals from OfficeRnD have `officerndSyncId` FK set.
 - `mail/` - SMTP email via `@nestjs-modules/mailer` + `nodemailer`
-- `calendar/` - Google Calendar integration with per-user OAuth2 (`googleapis` package). `GoogleToken` entity stores per-user tokens in `google_tokens` table. `GET /calendar/connect` returns OAuth URL (any authenticated user). `GET /calendar/oauth/callback` is `@Public()` — handles Google redirect, stores token for the user encoded in `state` param. `GET /calendar/status` returns connection status. Calendar events include `timeZone: "Asia/Qatar"`.
+- `calendar/` - TidyCal integration with per-user OAuth2 (native `fetch`). `TidyCalToken` entity stores per-user tokens in `tidycal_tokens` table. `GET /calendar/connect` returns OAuth URL (any authenticated user). `GET /calendar/oauth/callback` is `@Public()` — handles TidyCal redirect, stores token for the user encoded in `state` param. `GET /calendar/status` returns connection status. Supports booking types, direct booking creation/update/cancel, and booking link generation.
 
 ### Frontend Stack
 - **React 18** + **Vite 5** + **TypeScript**
@@ -81,7 +81,7 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `/reports` - Overall staff summary (month filter, win/lost rates), staff win/loss + win rate charts, location/source charts (ApexCharts), space type breakdown, pipeline stage table, broker performance (month filter), PDF export
 - `/users` - User management (admin-only)
 - `/officernd` - OfficeRnD renewal triage (admin-only): table of expiring memberships, inline assign-to dropdown, bulk send-to-pipeline, status tabs (default=PENDING), upstream change flags, sync-now button
-- `/profile` - Edit name, email, change password, connect Google Calendar (per-user OAuth2)
+- `/profile` - Edit name, email, change password, connect TidyCal (per-user OAuth2)
 
 ### Key Components
 - `PhoneInput` - Qatar +974 phone with flag SVG, configurable `maxDigits` (6 for deals, 8 for clients/brokers)
@@ -133,9 +133,9 @@ OFFICERND_CLIENT_ID=...
 OFFICERND_CLIENT_SECRET=...
 OFFICERND_GRANT_TYPE=client_credentials
 OFFICERND_SCOPE=flex.community.memberships.read flex.community.companies.read flex.community.members.read
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=https://arafatcrm.cloud/api/v1/calendar/oauth/callback
+TIDYCAL_CLIENT_ID=your-tidycal-client-id
+TIDYCAL_CLIENT_SECRET=your-tidycal-client-secret
+TIDYCAL_REDIRECT_URI=https://arafatcrm.cloud/api/v1/calendar/oauth/callback
 ```
 
 ## Environment Setup
@@ -193,9 +193,8 @@ pnpm dev
 28. **OfficeRnD API endpoints**: Memberships at `/api/v2/organizations/{slug}/memberships`, companies at `/api/v2/organizations/{slug}/companies`, members at `/api/v2/organizations/{slug}/members`. All use `$limit=50` max and `cursorNext` pagination. No `$expand` support — company/member IDs must be resolved separately. Membership fields: `_id`, `company` (ID), `name`, `price`, `endDate`, `member` (ID). Company fields: `_id`, `name`, `email`, `address`. Member fields: `_id`, `phone`, `mobile`, `email`. The ID field is `_id` (not `id`).
 29. **OfficeRnD data enrichment**: Memberships contain a company ID and member ID reference. The sync service fetches all companies into a `Map<id, company>` and all members into a `Map<id, member>`, then enriches each membership with `companyName`, `contactEmail`, and `contactPhone`. Phone is extracted from `member.phone`, `member.mobile`, then falls back to company fields (`company.phone`, `company.address.phone`, `company.billingAddress.phone`). Members API requires `flex.community.members.read` scope — if scope is missing, fetch silently fails and phone falls back to company data only.
 30. **OfficeRnD query method**: Use `findAndCount` with `relations: ["assignedUser", "client", "deal"]` — NOT `createQueryBuilder` with `leftJoinAndSelect`. The QueryBuilder approach fails at runtime with `TypeError: Cannot read properties of undefined (reading 'databaseName')` in production.
-32. **Calendar per-user OAuth**: Each staff member connects their own Google account via the Profile page (`/profile`). OAuth `state` param carries base64-encoded userId so the callback (`@Public()` endpoint) knows which user to store the token for. `GET /calendar/connect` is available to any authenticated user (not admin-only). `GoogleToken` entity uses `upsert` on `userId` — reconnecting replaces the old token.
-33. **Meeting scheduling**: Deals in the Meeting stage have `meetingDate`, `meetingTime`, `meetingDuration` (fixed 30 min), `meetingLocation`, `meetingNotes`, and `calendarEventId` columns. `POST /deals/:id/schedule-meeting` saves locally AND creates/updates a Google Calendar event if the user has connected their account. Calendar errors are caught silently — meeting data always saves locally even without Google connection.
-34. **Calendar event timezone**: All Google Calendar events use `timeZone: "Asia/Qatar"` (UTC+3, no DST). Meeting time slots are 08:30–17:00 Sunday–Thursday.
+32. **Calendar per-user OAuth**: Each staff member connects their own TidyCal account via the Profile page (`/profile`). OAuth `state` param carries base64-encoded userId so the callback (`@Public()` endpoint) knows which user to store the token for. `GET /calendar/connect` is available to any authenticated user (not admin-only). `TidyCalToken` entity uses `upsert` on `userId` — reconnecting replaces the old token.
+33. **Meeting scheduling**: Deals in the Meeting stage have `meetingDate`, `meetingTime`, `meetingDuration` (fixed 30 min), `meetingLocation`, `meetingNotes`, and `calendarEventId` columns. `POST /deals/:id/schedule-meeting` saves locally AND creates/updates a TidyCal booking if the user has connected their account. TidyCal API errors are caught silently — meeting data always saves locally even without TidyCal connection.
+34. **Calendar event timezone**: All TidyCal bookings use `timeZone: "Asia/Qatar"` (UTC+3, no DST). Meeting time slots are 08:30–17:00 Sunday–Thursday.
 35. **markAsLost sets stage**: The `markAsLost` service method sets both `status = "lost"` AND `stage = "LOST"` (plus appends to `stageHistory`). Without the stage update, lost deals won't appear in the pipeline Lost column.
 36. **Pipeline data fetching**: The pipeline board fetches deals with all three statuses (`active`, `won`, `lost`) via `Promise.all` and buckets them client-side into 8 columns. Won/Lost deals are NOT filtered out.
-37. **`googleapis` type annotation**: `CalendarService.getAuthClient()` must have explicit return type `Promise<Auth.OAuth2Client | null>` to avoid TS2742 ("inferred type cannot be named without reference to google-auth-library").
