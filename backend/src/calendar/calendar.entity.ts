@@ -9,8 +9,8 @@ import {
 } from "typeorm";
 import { User } from "../users/user.entity";
 
-@Entity("google_tokens")
-export class GoogleToken {
+@Entity("tidycal_tokens")
+export class TidyCalToken {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
@@ -30,8 +30,14 @@ export class GoogleToken {
   @Column({ type: "timestamp", name: "token_expiry" })
   tokenExpiry!: Date;
 
-  @Column({ type: "varchar", nullable: true })
-  scope!: string;
+  @Column({ type: "varchar", nullable: true, name: "booking_type_id" })
+  bookingTypeId: string | null = null;
+
+  @Column({ type: "varchar", nullable: true, name: "username" })
+  username: string | null = null;
+
+  @Column({ type: "varchar", nullable: true, name: "booking_type_slug" })
+  bookingTypeSlug: string | null = null;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
