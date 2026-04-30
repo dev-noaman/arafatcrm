@@ -26,6 +26,10 @@ export class OfficerndSync extends BaseEntity {
   @Column({ name: "membership_type", type: "varchar", nullable: true })
   membershipType: string | null = null;
 
+  @Index()
+  @Column({ name: "membership_type_class", type: "varchar", nullable: true })
+  membershipTypeClass: string | null = null;
+
   @Column({
     name: "membership_value",
     type: "decimal",
