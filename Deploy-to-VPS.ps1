@@ -183,16 +183,19 @@ function Invoke-VpsCommand {
     }
 
     try {
+        # Run via cmd.exe so stderr is merged into stdout at the OS level. Otherwise
+        # PowerShell 5.1 converts every stderr line ssh forwards (e.g. "nginx [warn]")
+        # into a NativeCommandError ErrorRecord that surfaces as a terminating error
+        # right at the call site, even with try/catch and -ErrorAction tweaks.
         if ($script:UseOpenSSH) {
-            $sshCommand = "ssh -o StrictHostKeyChecking=no ${VpsUser}@${VpsHost} `"$Command`""
+            $sshLine = "ssh -o StrictHostKeyChecking=no ${VpsUser}@${VpsHost} `"$Command`" 2>&1"
         } else {
-            $sshCommand = "plink -pw `"$VpsPassword`" -batch ${VpsUser}@${VpsHost} `"$Command`""
+            $sshLine = "plink -pw `"$VpsPassword`" -batch ${VpsUser}@${VpsHost} `"$Command`" 2>&1"
         }
-
-        $result = Invoke-Expression $sshCommand 2>&1
+        $rawOutput = & cmd /c $sshLine
         $exitCode = $LASTEXITCODE
 
-        $resultString = if ($result) { $result | Out-String } else { "" }
+        $resultString = if ($rawOutput) { ($rawOutput -join "`n") } else { "" }
 
         if ($ReturnOutput) {
             return $resultString
@@ -221,7 +224,10 @@ function Invoke-VpsScript {
 
     $tempFile = Join-Path $env:TEMP "vps-deploy-$(Get-Random).sh"
     try {
-        [System.IO.File]::WriteAllText($tempFile, $Script, [System.Text.UTF8Encoding]::new($false))
+        # CRLF would break bash on the VPS (line 1: set: -, $'\r': command not found).
+        # PowerShell heredocs can include \r\n; force LF before writing.
+        $normalizedScript = $Script -replace "`r`n", "`n"
+        [System.IO.File]::WriteAllText($tempFile, $normalizedScript, [System.Text.UTF8Encoding]::new($false))
 
         # Copy script to VPS
         $remoteScript = "/tmp/vps-deploy-$(Get-Random).sh"
@@ -473,11 +479,13 @@ echo "INIT_DEPS_COMPLETE"
 
         if ($result -match "INIT_DEPS_COMPLETE") {
             Write-Log "System dependencies installed" -Color $Colors.Success
-        } else {
-            Write-Log "Dependencies installation may have issues" -Color $Colors.Warning
+            return $true
         }
 
-        return $true
+        Write-Log "Initial dependency install did not complete - INIT_DEPS_COMPLETE sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "Initial setup failed: $_" -Color $Colors.Error
@@ -545,9 +553,13 @@ echo "BACKEND_ENV_COMPLETE"
 
         if ($result -match "BACKEND_ENV_COMPLETE") {
             Write-Log "Backend environment configured" -Color $Colors.Success
+            return $true
         }
 
-        return $true
+        Write-Log "Backend env setup did not complete - BACKEND_ENV_COMPLETE sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "Backend environment setup failed: $_" -Color $Colors.Error
@@ -571,9 +583,13 @@ echo "SEED_COMPLETE"
 
         if ($result -match "SEED_COMPLETE") {
             Write-Log "Database seeded successfully" -Color $Colors.Success
+            return $true
         }
 
-        return $true
+        Write-Log "Database seed did not complete - SEED_COMPLETE sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "Database seeding failed: $_" -Color $Colors.Error
@@ -711,9 +727,13 @@ echo "NGINX_CONFIGURED"
 
         if ($result -match "NGINX_CONFIGURED") {
             Write-Log "Nginx configured successfully" -Color $Colors.Success
+            return $true
         }
 
-        return $true
+        Write-Log "Nginx configuration did not complete - NGINX_CONFIGURED sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "Nginx configuration failed: $_" -Color $Colors.Error
@@ -748,9 +768,13 @@ echo "PM2_STARTED"
 
         if ($result -match "PM2_STARTED") {
             Write-Log "PM2 process started successfully" -Color $Colors.Success
+            return $true
         }
 
-        return $true
+        Write-Log "PM2 start did not complete - PM2_STARTED sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "PM2 start failed: $_" -Color $Colors.Error
@@ -779,6 +803,11 @@ pnpm --filter @arafat/shared build
 cd backend
 pnpm build
 
+# Run pending TypeORM migrations against compiled dist/ (CLAUDE.md note 23:
+# never use the TypeORM CLI on the VPS — it forks a recursive Node process).
+echo "Running database migrations..."
+node scripts/run-migrations-prod.js
+
 # Restart PM2 process
 pm2 restart arafatcrm-api 2>/dev/null || pm2 start dist/src/main.js --name arafatcrm-api
 pm2 save
@@ -790,9 +819,13 @@ echo "UPDATE_COMPLETE"
 
         if ($result -match "UPDATE_COMPLETE") {
             Write-Log "Backend updated successfully" -Color $Colors.Success
+            return $true
         }
 
-        return $true
+        Write-Log "Backend update did not complete - UPDATE_COMPLETE sentinel missing." -Color $Colors.Error
+        Write-Log "Remote output:" -Color $Colors.Error
+        Write-Log $result -Color $Colors.Error
+        return $false
     }
     catch {
         Write-Log "Backend update failed: $_" -Color $Colors.Error
@@ -950,14 +983,18 @@ function Start-Deployment {
         $results.Backend = Deploy-Backend
 
         if ($results.Backend) {
+            # Track each step so the summary reflects actual remote success,
+            # not just the file-transfer step.
             if ($Init) {
-                Setup-BackendEnvironment | Out-Null
-                Seed-Database | Out-Null
-                Configure-Nginx | Out-Null
-                Start-Pm2Process | Out-Null
+                $envOk    = Setup-BackendEnvironment
+                $seedOk   = if ($envOk) { Seed-Database } else { $false }
+                $nginxOk  = Configure-Nginx
+                $pm2Ok    = Start-Pm2Process
+                $results.Backend = $envOk -and $seedOk -and $nginxOk -and $pm2Ok
             } else {
-                Update-Backend | Out-Null
-                Configure-Nginx | Out-Null
+                $updateOk = Update-Backend
+                $nginxOk  = Configure-Nginx
+                $results.Backend = $updateOk -and $nginxOk
             }
         }
     } else {
