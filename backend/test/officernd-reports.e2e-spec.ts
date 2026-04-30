@@ -501,4 +501,36 @@ describe("OfficerndReports endpoints", () => {
       expect(res.body.active).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ── Task 10 tests ──────────────────────────────────────────────────────────
+
+  describe("GET /reports/officernd/type-summary", () => {
+    it("returns counts grouped by class, excluding IGNORED", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/reports/officernd/type-summary")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      // Cross-check against direct DB query (matches Task 8's by-type pattern)
+      const dbCount = await dataSource.query(
+        `SELECT COUNT(*)::int AS cnt FROM officernd_sync WHERE status != 'IGNORED'`
+      );
+      const total = res.body.reduce((s: number, r: any) => s + r.count, 0);
+      expect(total).toBe(dbCount[0].cnt);
+      expect(total).toBeGreaterThanOrEqual(7); // our seed contributes at least 7 non-IGNORED rows
+    });
+  });
+
+  describe("GET /reports/officernd/win-loss", () => {
+    it("returns per-staff win/loss for OfficeRnD-linked deals only", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/reports/officernd/win-loss")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      const sales1 = res.body.find((r: any) => r.userName.includes("sales1"));
+      expect(sales1).toBeDefined();
+      expect(sales1.won).toBe(1);
+      expect(sales1.lost).toBe(1);
+      expect(sales1.winRate).toBe(50);
+    });
+  });
 });

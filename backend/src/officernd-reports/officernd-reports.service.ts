@@ -95,6 +95,58 @@ export class OfficerndReportsService {
     });
   }
 
+  async getReportTypeSummary(month?: string) {
+    const qb = this.syncRepo
+      .createQueryBuilder("s")
+      .where("s.status != :ignored", { ignored: "IGNORED" });
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      qb.andWhere("s.created_at >= :start AND s.created_at < :end", {
+        start: new Date(y, m - 1, 1),
+        end: new Date(y, m, 1),
+      });
+    }
+    const rows = await qb
+      .select("s.membershipTypeClass", "type")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("s.membershipTypeClass")
+      .getRawMany();
+    return rows.map((r) => ({ type: r.type ?? "OTHERS", count: parseInt(r.count, 10) }));
+  }
+
+  async getReportWinLoss(month?: string) {
+    const qb = this.dealsRepo
+      .createQueryBuilder("d")
+      .leftJoin("d.owner", "u")
+      .leftJoin("d.officerndSync", "s")
+      .where("d.officerndSyncId IS NOT NULL");
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      qb.andWhere("s.created_at >= :start AND s.created_at < :end", {
+        start: new Date(y, m - 1, 1),
+        end: new Date(y, m, 1),
+      });
+    }
+    const rows = await qb
+      .select("u.id", "userId")
+      .addSelect("u.name", "userName")
+      .addSelect("u.email", "userEmail")
+      .addSelect(`SUM(CASE WHEN d.status = 'won' OR d.stage = 'WON' THEN 1 ELSE 0 END)`, "won")
+      .addSelect(`SUM(CASE WHEN d.status = 'lost' OR d.stage = 'LOST' THEN 1 ELSE 0 END)`, "lost")
+      .groupBy("u.id").addGroupBy("u.name").addGroupBy("u.email")
+      .getRawMany();
+    return rows.map((r) => {
+      const won = parseInt(r.won, 10) || 0;
+      const lost = parseInt(r.lost, 10) || 0;
+      return {
+        userId: r.userId,
+        userName: r.userName ?? r.userEmail,
+        won, lost,
+        winRate: won + lost > 0 ? Math.round((won / (won + lost)) * 1000) / 10 : 0,
+      };
+    });
+  }
+
   async getDashboardWinLoss() {
     const rows = await this.dealsRepo
       .createQueryBuilder("d")

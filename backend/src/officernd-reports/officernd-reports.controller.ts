@@ -40,4 +40,16 @@ export class OfficerndReportsController {
   getReportStaffSummary(@Query("month") month?: string) {
     return this.service.getReportStaffSummary(month);
   }
+
+  @Get("reports/officernd/type-summary")
+  @ApiOperation({ summary: "Membership type breakdown counts (filterable by month)" })
+  getReportTypeSummary(@Query("month") month?: string) {
+    return this.service.getReportTypeSummary(month);
+  }
+
+  @Get("reports/officernd/win-loss")
+  @ApiOperation({ summary: "Per-staff win/loss for OfficeRnD deals (filterable by month on sync.created_at)" })
+  getReportWinLoss(@Query("month") month?: string) {
+    return this.service.getReportWinLoss(month);
+  }
 }
