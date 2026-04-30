@@ -331,14 +331,12 @@ Expected: by-source assertion FAILS — current response still includes the OFFI
 In each method, add the filter after the existing `where`:
 
 ```ts
-// getStats — totalDeals count
-const baseWhere: any = {};
-if (isSales) baseWhere.owner = { id: userId };
-const totalDeals = await this.dealsRepo
+// getStats — convert totalDeals to QueryBuilder for the IS NULL filter
+const totalDealsQb = this.dealsRepo
   .createQueryBuilder("deal")
-  .where("deal.officernd_sync_id IS NULL")
-  .andWhere(isSales ? "deal.owner_id = :uid" : "1=1", { uid: userId })
-  .getCount();
+  .where("deal.officernd_sync_id IS NULL");
+if (isSales) totalDealsQb.andWhere("deal.owner_id = :uid", { uid: userId });
+const totalDeals = await totalDealsQb.getCount();
 ```
 
 Apply similar `andWhere("deal.officernd_sync_id IS NULL")` to `wonQb`, `lostQb`, the location query in `getByLocation`, and add `andWhere("client.source != 'OFFICERND_RENEWAL'")` to `getBySource`.
@@ -423,18 +421,38 @@ else if (source === "officernd") qb.andWhere("deal.officernd_sync_id IS NOT NULL
 const allDeals = await qb.getMany();
 ```
 
-Same change in `getStaffPerformance(month?)` — extend signature to `(month?, source = "all")` and apply the same filter to its `dealsRepo.find` call (convert to QueryBuilder if needed).
+Same change in `getStaffPerformance(month?)` — extend signature to `(month?: string, source: "leads" | "officernd" | "all" = "all")` and convert the `dealsRepo.find` to a QueryBuilder so the `IS NULL` / `IS NOT NULL` filter composes cleanly with the existing month range:
 
-- [ ] **Step 4: Update reports.controller.ts to pass through the param**
+```ts
+const qb = this.dealsRepo.createQueryBuilder("deal").leftJoinAndSelect("deal.owner", "owner");
+if (month) {
+  const [year, m] = month.split("-").map(Number);
+  qb.andWhere("deal.created_at >= :start AND deal.created_at < :end", {
+    start: new Date(year, m - 1, 1),
+    end: new Date(year, m, 1),
+  });
+}
+if (source === "leads") qb.andWhere("deal.officernd_sync_id IS NULL");
+else if (source === "officernd") qb.andWhere("deal.officernd_sync_id IS NOT NULL");
+const deals = await qb.getMany();
+```
+Replace the original `dealsRepo.find({ ... })` call with this. The downstream `for (const deal of deals)` loop and aggregation logic stay unchanged.
+
+- [ ] **Step 4: Update reports.controller.ts to pass through the param (preserve existing `@ApiOperation` decorators)**
 
 ```ts
 @Get("win-loss")
-getWinLossReport(@Query("source") source: "leads" | "officernd" | "all" = "all", @User() user: any) {
+@ApiOperation({ summary: "Get win/loss report by user" })
+getWinLossReport(
+  @Query("source") source: "leads" | "officernd" | "all" = "all",
+  @User() user: any,
+) {
   return this.reportsService.getWinLossReport(user.id, user.role, source);
 }
 
 @Get("staff-performance")
 @Roles(Role.ADMIN)
+@ApiOperation({ summary: "Get monthly staff performance report (admin only)" })
 getStaffPerformance(
   @Query("month") month?: string,
   @Query("source") source: "leads" | "officernd" | "all" = "all",
@@ -569,9 +587,18 @@ git commit -m "feat(officernd-reports): scaffold module with empty controller an
 Path: `backend/test/officernd-reports.e2e-spec.ts` — bootstrap as in earlier tasks. Seed:
 
 - Admin user + 2 sales users (sales1, sales2)
-- 8 `officernd_sync` rows: 2 PENDING, 3 ASSIGNED (2 to sales1, 1 to sales2), 2 PIPELINED (1 to sales1, 1 to sales2), 1 IGNORED. Distribute classes: 2 OFFICE, 2 VIRTUAL_OFFICE, 1 TRADE_LICENSE, 2 COWORKING, 1 OTHERS.
-- 5 deals: 3 link to PIPELINED sync rows (1 won by sales1, 1 lost by sales1, 1 active by sales2). 2 organic deals (no `officerndSyncId`).
+- 8 `officernd_sync` rows:
+  - 2 PENDING (no `assignedTo`, no `dealId`)
+  - 2 ASSIGNED: 1 to sales1, 1 to sales2 (no `dealId`)
+  - 3 PIPELINED: 2 to sales1 (with `dealId` set — one row backs the won deal, one row backs the lost deal), 1 to sales2 (with `dealId` set — backs the active deal)
+  - 1 IGNORED
+  - Membership-type distribution: 2 OFFICE, 2 VIRTUAL_OFFICE, 1 TRADE_LICENSE, 2 COWORKING, 1 OTHERS.
+- 5 deals:
+  - 3 OfficeRnD-linked: 1 won (owned by sales1, linked from one of sales1's PIPELINED sync rows), 1 lost (owned by sales1, linked from sales1's other PIPELINED row), 1 active (owned by sales2, linked from sales2's PIPELINED row).
+  - 2 organic: no `officerndSyncId`.
 - One sync row with `created_at` two months ago for month-filter tests.
+
+> **Why two PIPELINED rows for sales1:** `OfficerndSync.dealId` is a single nullable column, so each sync row backs at most one deal. To give sales1 both a won and a lost OfficeRnD deal in the fixture, sales1 needs two separate PIPELINED sync rows — one per deal.
 
 Test cases for this task:
 
@@ -582,7 +609,7 @@ describe("GET /dashboard/officernd/lifecycle-summary", () => {
       .get("/api/v1/dashboard/officernd/lifecycle-summary")
       .set("Authorization", `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ pending: 2, assigned: 3, pipelined: 2, ignored: 1 });
+    expect(res.body).toEqual({ pending: 2, assigned: 2, pipelined: 3, ignored: 1 });
   });
   it("403s for SALES role", async () => {
     const res = await request(app.getHttpServer())
@@ -610,7 +637,7 @@ describe("GET /dashboard/officernd/assigned-by-staff", () => {
       .set("Authorization", `Bearer ${adminToken}`);
     const sales1Row = res.body.find((r: any) => r.userName.includes("sales1"));
     const sales2Row = res.body.find((r: any) => r.userName.includes("sales2"));
-    expect(sales1Row.count).toBe(3); // 2 ASSIGNED + 1 PIPELINED
+    expect(sales1Row.count).toBe(3); // 1 ASSIGNED + 2 PIPELINED
     expect(sales2Row.count).toBe(2); // 1 ASSIGNED + 1 PIPELINED
   });
 });
@@ -764,8 +791,8 @@ describe("GET /reports/officernd/staff-summary", () => {
       .set("Authorization", `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     const sales1 = res.body.find((r: any) => r.userName.includes("sales1"));
-    expect(sales1.assigned).toBe(3);
-    expect(sales1.pipelined).toBe(1);
+    expect(sales1.assigned).toBe(3);  // 1 ASSIGNED + 2 PIPELINED rows owned by sales1
+    expect(sales1.pipelined).toBe(2); // 2 PIPELINED rows
     expect(sales1.won).toBe(1);
     expect(sales1.lost).toBe(1);
     expect(sales1.winRate).toBe(50);
@@ -1470,9 +1497,7 @@ git commit -m "feat(reports): scope existing staff sections to Lead Sources only
 - Create: `frontend/src/pages/reports/OfficerndWinLossSection.tsx`
 - Modify: `frontend/src/pages/reports/ReportsPage.tsx`
 
-- [ ] **Step 1: Extract MONTHS constant to shared util (optional but DRY)**
-
-If creating three new sections that all need the same MONTHS dropdown is too repetitive, factor out:
+- [ ] **Step 1: Extract MONTHS constant to shared util (DRY — three new files would otherwise duplicate the IIFE)**
 
 Path: `frontend/src/pages/reports/months.ts`
 
@@ -1489,7 +1514,7 @@ export const MONTHS = (() => {
 })();
 ```
 
-Update `OverallSummarySection.tsx` and `BrokerSection.tsx` to import from this module instead of declaring inline. (Skip if it would touch unrelated sections — declare locally in the new files.)
+Update existing `OverallSummarySection.tsx` and `BrokerSection.tsx` to import from this module and delete their local `MONTHS` IIFEs. The three new sections in this task all import the same constant.
 
 - [ ] **Step 2: Create OfficerndStaffSummarySection**
 
