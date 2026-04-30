@@ -4,8 +4,11 @@ import { reportsApi } from "@/api/reports";
 import { Card } from "@/components/ui";
 import { LocationChart, SourceChart, StaffWinLossChart, StaffWinRateChart } from "@/components/charts";
 import { Briefcase, DollarSign, TrendingUp } from "lucide-react";
+import { useAuthStore } from "@/contexts/auth-store";
+import OfficerndDashboardSection from "./OfficerndDashboardSection";
 
 export default function DashboardPage() {
+  const isAdmin = useAuthStore((s) => s.user?.role === "ADMIN");
   const { data: stats, isLoading } = useQuery({
     queryKey: ["dashboard", "stats"],
     queryFn: () => dashboardApi.getStats(),
@@ -35,7 +38,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -44,58 +47,68 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-        {statCards.map((stat) => (
-          <Card key={stat.title} className="p-5">
-            <div className="flex items-center gap-4">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bg}`}>
-                <stat.icon className={`h-6 w-6 ${stat.color}`} />
+      {/* Lead Sources */}
+      <div className="space-y-6 border-l-4 border-blue-500 pl-6">
+        <div>
+          <h2 className="text-title-md font-semibold text-blue-700">Lead Sources</h2>
+          <p className="mt-1 text-sm text-gray-500">Organic leads from marketing channels and referrals</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          {statCards.map((stat) => (
+            <Card key={stat.title} className="p-5">
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.bg}`}>
+                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{stat.title}</p>
+                  <p className="text-xl font-bold text-gray-900">{isLoading ? "-" : stat.value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                <p className="text-xl font-bold text-gray-900">{isLoading ? "-" : stat.value}</p>
-              </div>
-            </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Location + Source Charts */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card title="Deals by Location">
+            {locationLoading ? (
+              <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
+            ) : (
+              <LocationChart data={byLocation ?? []} />
+            )}
           </Card>
-        ))}
+          <Card title="Deals by Client Source">
+            {sourceLoading ? (
+              <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
+            ) : (
+              <SourceChart data={bySource ?? []} />
+            )}
+          </Card>
+        </div>
+
+        {/* Staff Charts */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card title="Staff Win / Loss">
+            {winLossLoading ? (
+              <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
+            ) : (
+              <StaffWinLossChart data={winLossData ?? []} />
+            )}
+          </Card>
+          <Card title="Staff Win Rate">
+            {winLossLoading ? (
+              <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
+            ) : (
+              <StaffWinRateChart data={winLossData ?? []} />
+            )}
+          </Card>
+        </div>
       </div>
 
-      {/* Location + Source Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card title="Deals by Location">
-          {locationLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-          ) : (
-            <LocationChart data={byLocation ?? []} />
-          )}
-        </Card>
-        <Card title="Deals by Client Source">
-          {sourceLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-          ) : (
-            <SourceChart data={bySource ?? []} />
-          )}
-        </Card>
-      </div>
-
-      {/* Staff Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card title="Staff Win / Loss">
-          {winLossLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-          ) : (
-            <StaffWinLossChart data={winLossData ?? []} />
-          )}
-        </Card>
-        <Card title="Staff Win Rate">
-          {winLossLoading ? (
-            <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-          ) : (
-            <StaffWinRateChart data={winLossData ?? []} />
-          )}
-        </Card>
-      </div>
+      {isAdmin && <OfficerndDashboardSection />}
     </div>
   );
 }

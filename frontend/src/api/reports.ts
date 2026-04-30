@@ -1,5 +1,7 @@
 import apiClient from "@/lib/api-client";
 
+export type ReportSource = "leads" | "officernd" | "all";
+
 export interface WinLossReport {
   userId: string;
   userName: string;
@@ -63,8 +65,9 @@ export interface SpaceTypeReport {
 }
 
 export const reportsApi = {
-  getWinLoss: async (): Promise<WinLossReport[]> => {
-    const response = await apiClient.get("/reports/win-loss");
+  getWinLoss: async (source?: ReportSource): Promise<WinLossReport[]> => {
+    const params = source ? { source } : {};
+    const response = await apiClient.get("/reports/win-loss", { params });
     return response.data;
   },
 
@@ -79,8 +82,10 @@ export const reportsApi = {
     return response.data;
   },
 
-  getStaffPerformance: async (month?: string): Promise<StaffPerformanceReport[]> => {
-    const params = month ? { month } : {};
+  getStaffPerformance: async (month?: string, source?: ReportSource): Promise<StaffPerformanceReport[]> => {
+    const params: any = {};
+    if (month) params.month = month;
+    if (source) params.source = source;
     const response = await apiClient.get("/reports/staff-performance", { params });
     return response.data;
   },

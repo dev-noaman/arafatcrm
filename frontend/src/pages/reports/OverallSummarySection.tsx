@@ -4,30 +4,20 @@ import { reportsApi } from "@/api/reports";
 import { Card } from "@/components/ui";
 import { Users, FileDown } from "lucide-react";
 import { useExportPdf } from "@/hooks/use-export-pdf";
-
-const MONTHS = (() => {
-  const opts = [{ value: "", label: "All Time" }];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    opts.push({ value: val, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }) });
-  }
-  return opts;
-})();
+import { MONTHS } from "./months";
 
 export default function OverallSummarySection() {
   const [month, setMonth] = useState("");
   const { ref, exportPdf } = useExportPdf("Overall-Summary-Report");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["reports", "staff-performance", month],
-    queryFn: () => reportsApi.getStaffPerformance(month || undefined),
+    queryKey: ["reports", "staff-performance", month, "leads"],
+    queryFn: () => reportsApi.getStaffPerformance(month || undefined, "leads"),
   });
 
   return (
     <Card
-      title="Overall Summary Report"
+      title="Overall Summary Report (Lead Sources)"
       description="Staff performance with deal amounts"
       action={
         <div className="flex items-center gap-2">

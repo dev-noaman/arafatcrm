@@ -19,6 +19,7 @@ import { DataSourcesModule } from "./data-sources/data-sources.module";
 import { MailModule } from "./mail/mail.module";
 import { TodosModule } from "./todos/todos.module";
 import { OfficerndModule } from "./officernd/officernd.module";
+import { OfficerndReportsModule } from "./officernd-reports/officernd-reports.module";
 import { CalendarModule } from "./calendar/calendar.module";
 import { JwtGuard, RolesGuard } from "./common/guards";
 
@@ -56,6 +57,7 @@ import { JwtGuard, RolesGuard } from "./common/guards";
     MailModule,
     TodosModule,
     OfficerndModule,
+    OfficerndReportsModule,
     CalendarModule,
   ],
   controllers: [AppController],

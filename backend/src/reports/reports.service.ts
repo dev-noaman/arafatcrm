@@ -5,6 +5,8 @@ import { Deal } from "../deals/deal.entity";
 import { User } from "../users/user.entity";
 import { Broker } from "../brokers/broker.entity";
 
+type SourceFilter = "leads" | "officernd" | "all";
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -13,15 +15,15 @@ export class ReportsService {
     @InjectRepository(Broker) private brokersRepo: Repository<Broker>,
   ) {}
 
-  async getWinLossReport(userId?: string, userRole?: string) {
+  async getWinLossReport(userId?: string, userRole?: string, source: SourceFilter = "all") {
     const users = await this.usersRepo.find();
     const userMap = new Map(users.map((u) => [u.id, u.name || u.email]));
 
-    const findOptions: any = { relations: ["owner"] };
-    if (userRole === "SALES" && userId) {
-      findOptions.where = { owner: { id: userId } };
-    }
-    const allDeals = await this.dealsRepo.find(findOptions);
+    const qb = this.dealsRepo.createQueryBuilder("deal").leftJoinAndSelect("deal.owner", "owner");
+    if (userRole === "SALES" && userId) qb.andWhere("deal.owner_id = :uid", { uid: userId });
+    if (source === "leads") qb.andWhere("deal.officernd_sync_id IS NULL");
+    else if (source === "officernd") qb.andWhere("deal.officernd_sync_id IS NOT NULL");
+    const allDeals = await qb.getMany();
 
     const report = new Map<string, { userName: string; won: number; lost: number; wonValue: number; lostValue: number }>();
 
@@ -143,22 +145,21 @@ export class ReportsService {
     }));
   }
 
-  async getStaffPerformance(month?: string) {
+  async getStaffPerformance(month?: string, source: SourceFilter = "all") {
     const users = await this.usersRepo.find();
     const userMap = new Map(users.map((u) => [u.id, u.name || u.email]));
 
-    let dateFilter: any = {};
+    const qb = this.dealsRepo.createQueryBuilder("deal").leftJoinAndSelect("deal.owner", "owner");
     if (month) {
       const [year, m] = month.split("-").map(Number);
-      const start = new Date(year, m - 1, 1);
-      const end = new Date(year, m, 1);
-      dateFilter = { createdAt: Between(start, end) };
+      qb.andWhere("deal.created_at >= :start AND deal.created_at < :end", {
+        start: new Date(year, m - 1, 1),
+        end: new Date(year, m, 1),
+      });
     }
-
-    const deals = await this.dealsRepo.find({
-      where: Object.keys(dateFilter).length > 0 ? dateFilter : undefined,
-      relations: ["owner"],
-    });
+    if (source === "leads") qb.andWhere("deal.officernd_sync_id IS NULL");
+    else if (source === "officernd") qb.andWhere("deal.officernd_sync_id IS NOT NULL");
+    const deals = await qb.getMany();
 
     const byOwner = new Map<string, { totalAssigned: number; won: number; lost: number; active: number; wonValue: number; lostValue: number; activeValue: number; totalCommission: number }>();
 

@@ -7,8 +7,8 @@ import { useExportPdf } from "@/hooks/use-export-pdf";
 
 export default function StaffChartsSection() {
   const { data, isLoading } = useQuery({
-    queryKey: ["reports", "win-loss"],
-    queryFn: () => reportsApi.getWinLoss(),
+    queryKey: ["reports", "win-loss", "leads"],
+    queryFn: () => reportsApi.getWinLoss("leads"),
   });
 
   const winLoss = useExportPdf("Staff-Win-Loss");
@@ -22,7 +22,7 @@ export default function StaffChartsSection() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <Card title="Staff Win / Loss" action={pdfBtn(winLoss.exportPdf)}>
+      <Card title="Staff Win / Loss (Lead Sources)" action={pdfBtn(winLoss.exportPdf)}>
         <div ref={winLoss.ref}>
           {isLoading ? (
             <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>
@@ -31,7 +31,7 @@ export default function StaffChartsSection() {
           )}
         </div>
       </Card>
-      <Card title="Staff Win Rate" action={pdfBtn(winRate.exportPdf)}>
+      <Card title="Staff Win Rate (Lead Sources)" action={pdfBtn(winRate.exportPdf)}>
         <div ref={winRate.ref}>
           {isLoading ? (
             <div className="flex items-center justify-center h-[350px] text-gray-400">Loading...</div>

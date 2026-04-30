@@ -11,6 +11,7 @@ import { Client } from "../clients/client.entity";
 import { User } from "../users/user.entity";
 import { QueryOfficerndSyncDto, QuerySyncRunsDto } from "./dto";
 import { Cron } from "@nestjs/schedule";
+import { classifyMembershipType } from "../officernd-reports/membership-type.classifier";
 
 @Injectable()
 export class OfficerndService {
@@ -286,6 +287,7 @@ export class OfficerndService {
         contactEmail,
         contactPhone,
         membershipType,
+        membershipTypeClass: classifyMembershipType(membershipType),
         membershipValue,
         endDate: new Date(endDate),
         officerndData,
@@ -303,6 +305,7 @@ export class OfficerndService {
       existing.contactEmail = contactEmail;
       existing.contactPhone = contactPhone;
       existing.membershipType = membershipType;
+      existing.membershipTypeClass = classifyMembershipType(membershipType);
       existing.membershipValue = membershipValue;
       existing.endDate = new Date(endDate);
       existing.officerndData = officerndData;
