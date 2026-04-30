@@ -804,7 +804,7 @@ cd backend
 pnpm build
 
 # Run pending TypeORM migrations against compiled dist/ (CLAUDE.md note 23:
-# never use the TypeORM CLI on the VPS — it forks a recursive Node process).
+# never use the TypeORM CLI on the VPS - it forks a recursive Node process).
 echo "Running database migrations..."
 node scripts/run-migrations-prod.js
 
@@ -862,24 +862,38 @@ function Test-FrontendHealth {
 function Test-BackendHealth {
     Write-Log "Testing backend API endpoint..." -Color $Colors.Info
 
+    # GET /api/v1/auth/me is JWT-guarded but exists; it returns 401 unauthenticated,
+    # which proves both the route is registered and the JwtGuard is wired. /auth/login
+    # is POST-only, so a GET there 404s on a perfectly healthy backend (the previous
+    # bug here). Accepted codes: 200 (rare - would mean we somehow had a token) or 401.
+    $healthPath = "/api/v1/auth/me"
+    $accepted = @(200, 401)
+
     try {
-        $internalCheck = Invoke-VpsCommand -Command "curl -s -o /dev/null -w '%{http_code}' http://localhost:$BackendPort/api/v1/auth/login" -ReturnOutput -Silent
+        $internalCheck = Invoke-VpsCommand -Command "curl -s -o /dev/null -w '%{http_code}' http://localhost:$BackendPort$healthPath" -ReturnOutput -Silent
+        $internalCode = ($internalCheck -replace '\D', '')  # strip non-digits
 
-        if ($internalCheck -match "200|401|400") {
-            Write-Log "Backend health check PASSED (internal - HTTP $internalCheck)" -Color $Colors.Success
+        if ($internalCode -and ([int]$internalCode -in $accepted)) {
+            Write-Log "Backend health check PASSED (internal - HTTP $internalCode)" -Color $Colors.Success
             return $true
         }
 
-        $testUrl = "https://$VpsDomain/api/v1/auth/login"
-        $response = Invoke-WebRequest -Uri $testUrl -Method Get -TimeoutSec 30 -UseBasicParsing
-
-        if ($response.StatusCode -in @(200, 401, 400)) {
-            Write-Log "Backend health check PASSED" -Color $Colors.Success
-            return $true
-        } else {
-            Write-Log "Backend returned status code: $($response.StatusCode)" -Color $Colors.Warning
-            return $false
+        # Fall back to the public URL. Invoke-WebRequest throws on non-2xx by default -
+        # treat 401 as healthy by inspecting the thrown response.
+        try {
+            $response = Invoke-WebRequest -Uri "https://$VpsDomain$healthPath" -Method Get -TimeoutSec 30 -UseBasicParsing
+            $statusCode = [int]$response.StatusCode
+        } catch [System.Net.WebException] {
+            $statusCode = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
         }
+
+        if ($statusCode -in $accepted) {
+            Write-Log "Backend health check PASSED (public - HTTP $statusCode)" -Color $Colors.Success
+            return $true
+        }
+
+        Write-Log "Backend health check FAILED - internal=HTTP $internalCode, public=HTTP $statusCode (expected one of $($accepted -join ', '))" -Color $Colors.Warning
+        return $false
     }
     catch {
         Write-Log "Backend health check FAILED: $_" -Color $Colors.Warning
