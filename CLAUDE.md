@@ -55,10 +55,11 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - `brokers/` - Broker management with contract dates, broker type (Personal/Corporate), document uploads (QID, CR, TL, Computer Card, Others), `broker-document.entity.ts` for file attachments with CASCADE delete, `broker-upload.helper.ts` for Multer config (10MB, PDF/JPEG/PNG/WebP), bulk import
 - `deals/` - Deal pipeline with stage transitions, phone field, ownerId assignment, default stage "NEW". Meeting scheduling via `POST /deals/:id/schedule-meeting` and `DELETE /deals/:id/schedule-meeting`. Mark-as-lost sets both `status=lost` and `stage=LOST`.
 - `todos/` - Todo list CRUD scoped by userId
-- `dashboard/` - Stats and analytics
-- `reports/` - Overall staff summary (with month filter, win/lost rates), staff win/loss + win rate charts, location/source charts, pipeline stage chart, broker performance (with month filter), space type breakdown
+- `dashboard/` - Stats and analytics. All endpoints unconditionally exclude OfficeRnD-linked deals (`deal.officernd_sync_id IS NULL`) and OFFICERND_RENEWAL clients so the top cards and charts represent organic-lead performance only.
+- `reports/` - Overall staff summary (with month filter, win/lost rates), staff win/loss + win rate charts, location/source charts, pipeline stage chart, broker performance (with month filter), space type breakdown. `GET /reports/win-loss` and `GET /reports/staff-performance` accept `?source=leads|officernd|all` (default `all`); the leads-only sections in the frontend pass `source=leads`.
+- `officernd-reports/` - Admin-only OfficeRnD reporting endpoints under `/dashboard/officernd/*` (lifecycle-summary, by-type, assigned-by-staff, win-loss) and `/reports/officernd/*` (staff-summary, type-summary, win-loss). Houses the pure `classifyMembershipType()` helper (`membership-type.classifier.ts`) used by both this module and the OfficeRnD sync service. Class-level `@Roles(Role.ADMIN)` on the controller; routes declare full paths since they span two URL prefixes.
 - `data-sources/` - Dynamic data sources CRUD (backend only, frontend uses hardcoded list)
-- `officernd/` - OfficeRnD membership sync (cron every 30 min at :07/:37 Asia/Qatar), triage with assign/bulk-send-to-pipeline, `officernd_sync` entity (per-membership rows with PENDING→ASSIGNED→PIPELINED→IGNORED lifecycle), `officernd_sync_runs` entity (sync history), all endpoints admin-only via `@Roles(Role.ADMIN)`. Sync service never touches deals after initial push — only flags `upstreamChanges` diff for non-PENDING rows. Client auto-create uses source `OFFICERND_RENEWAL` with email dedup. Background sync uses `@nestjs/schedule` + `@nestjs/axios`. Pipeline deals from OfficeRnD have `officerndSyncId` FK set.
+- `officernd/` - OfficeRnD membership sync (cron every 30 min at :07/:37 Asia/Qatar), triage with assign/bulk-send-to-pipeline, `officernd_sync` entity (per-membership rows with PENDING→ASSIGNED→PIPELINED→IGNORED lifecycle, plus `membership_type_class` derived column populated by `classifyMembershipType()`), `officernd_sync_runs` entity (sync history), all endpoints admin-only via `@Roles(Role.ADMIN)`. Sync service never touches deals after initial push — only flags `upstreamChanges` diff for non-PENDING rows. Client auto-create uses source `OFFICERND_RENEWAL` with email dedup. Background sync uses `@nestjs/schedule` + `@nestjs/axios`. Pipeline deals from OfficeRnD have `officerndSyncId` FK set.
 - `mail/` - SMTP email via `@nestjs-modules/mailer` + `nodemailer`
 - `calendar/` - TidyCal integration with per-user OAuth2 (native `fetch`). `TidyCalToken` entity stores per-user tokens in `tidycal_tokens` table. `GET /calendar/connect` returns OAuth URL (any authenticated user). `GET /calendar/oauth/callback` is `@Public()` — handles TidyCal redirect, stores token for the user encoded in `state` param. `GET /calendar/status` returns connection status. Supports booking types, direct booking creation/update/cancel, and booking link generation.
 
@@ -73,12 +74,12 @@ Each module follows NestJS conventions with entity, controller, service, and DTO
 - UI template: TailAdmin (customized with `@theme` directives in `tailadmin.css`)
 
 ### Frontend Pages
-- `/dashboard` - Dashboard with stats, LocationChart, SourceChart (distinct colors), StaffWinLossChart, StaffWinRateChart
+- `/dashboard` - Two visually-grouped sections: **Lead Sources** (blue accent, all roles) with stat cards + LocationChart + SourceChart + StaffWinLossChart + StaffWinRateChart; **OfficeRnD Renewals** (purple accent, admin-only via `OfficerndDashboardSection.tsx`) with lifecycle stat cards (Pending/Assigned/Pipelined/Ignored), win/loss summary cards, MembershipTypeChart donut, and OfficerndAssignedByStaffChart bar.
 - `/clients` - Client CRUD with phone (Qatar +974), source dropdown, assign-to, view/edit modals, bulk import (CSV upload + template download)
 - `/brokers` - Broker CRUD with contract dates, type (Personal/Corporate), document upload/download, active status toggle, view/edit modals, bulk import (CSV upload + template download)
 - `/pipeline` - Kanban board (8 stages: New → Contract + Won + Lost). Contract cards have WIN/LOSS buttons (WIN sets `stage=WON`, LOSS opens reason modal then sets `stage=LOST`). Won column (green) and Lost column (red) are toggleable. Meeting-stage cards have Schedule/Reschedule button that opens a date/time picker (Sun-Thu, 08:30-17:30, 30-min slots). Deal detail modal with full inline editing, drag-and-drop stage changes.
 - `/deals` - Deal table with filters, client autocomplete, inline new client creation, Sales Rep and Broker columns
-- `/reports` - Overall staff summary (month filter, win/lost rates), staff win/loss + win rate charts, location/source charts (ApexCharts), space type breakdown, pipeline stage table, broker performance (month filter), PDF export
+- `/reports` - Overall staff summary (month filter, win/lost rates), staff win/loss + win rate charts, location/source charts (ApexCharts), space type breakdown, pipeline stage table, broker performance (month filter), PDF export. The two staff sections (`OverallSummarySection`, `StaffChartsSection`) pass `source=leads` to scope their data to organic leads. Below the existing sections, three admin-only OfficeRnD report sections render with a purple accent: `OfficerndStaffSummarySection` (per-staff assigned/pipelined/won/lost table), `OfficerndTypeSummarySection` (MembershipTypeChart donut), `OfficerndWinLossSection` (per-staff bar chart). Each new section has its own month dropdown and per-section PDF button via `useExportPdf`. The shared `MONTHS` constant lives in `frontend/src/pages/reports/months.ts`.
 - `/users` - User management (admin-only)
 - `/officernd` - OfficeRnD renewal triage (admin-only): table of expiring memberships, inline assign-to dropdown, bulk send-to-pipeline, status tabs (default=PENDING), upstream change flags, sync-now button
 - `/profile` - Edit name, email, change password, connect TidyCal (per-user OAuth2)
@@ -111,6 +112,7 @@ Contains enums and DTOs used by both frontend and backend:
 - `BrokerType`: PERSONAL, CORPORATE
 - `BrokerDocumentType`: QID, CR, TL, COMPUTER_CARD, OTHERS
 - `OfficerndSyncStatus`: PENDING, ASSIGNED, PIPELINED, IGNORED
+- `OfficerndMembershipType`: OFFICE, VIRTUAL_OFFICE, TRADE_LICENSE, COWORKING, OTHERS — derived from raw OfficeRnD plan names by the classifier in `backend/src/officernd-reports/membership-type.classifier.ts`. Order matters: virtual → tl/trade/license → flex/cowork/hot desk/dedicated → office → others (so "Virtual Office" → VIRTUAL_OFFICE not OFFICE; "Flex Office" → COWORKING not OFFICE). The `\btl\b` word-boundary check prevents false positives like "title" or "settler". The `officernd_sync.membership_type_class` column mirrors this and is populated on every sync write (create + PENDING-overwrite paths only — non-PENDING rows are not retroactively reclassified).
 - `ClientSource` also includes: `OFFICERND_RENEWAL` (used for auto-created clients from OfficeRnD sync)
 
 ## Environment Variables
@@ -208,15 +210,28 @@ docker-compose down         # Stop all services
 - `GET /todos`, `POST /todos`, `PUT /todos/:id`, `DELETE /todos/:id` (scoped by userId)
 
 ### Dashboard
-- `GET /dashboard/stats`
+- `GET /dashboard/stats` — leads-only (excludes deals with `officernd_sync_id`)
 - `GET /dashboard/revenue-timeseries`
-- `GET /dashboard/by-location`, `GET /dashboard/by-source`
+- `GET /dashboard/by-location` — leads-only
+- `GET /dashboard/by-source` — excludes the `OFFICERND_RENEWAL` bucket
 
 ### Reports
-- `GET /reports/win-loss` (with month filter)
+- `GET /reports/win-loss?source=leads|officernd|all` (default `all`)
 - `GET /reports/pipeline`
 - `GET /reports/broker-performance` (with month filter)
-- `GET /reports/staff-summary`, `GET /reports/space-type`
+- `GET /reports/staff-performance?month=YYYY-MM&source=leads|officernd|all` (default `all`, admin-only)
+- `GET /reports/space-type-breakdown`
+
+### OfficeRnD Reports (admin only)
+- `GET /dashboard/officernd/lifecycle-summary` → `{ pending, assigned, pipelined, ignored }`
+- `GET /dashboard/officernd/by-type` → `[{ type, count }]` (excludes IGNORED rows)
+- `GET /dashboard/officernd/assigned-by-staff` → `[{ userId, userName, count }]` (non-PENDING rows with `assigned_to` set)
+- `GET /dashboard/officernd/win-loss` → `{ won, lost, active, winRate }` for OfficeRnD-linked deals
+- `GET /reports/officernd/staff-summary?month=YYYY-MM` → per-staff `{ assigned, pipelined, won, lost, winRate }`
+- `GET /reports/officernd/type-summary?month=YYYY-MM` → `[{ type, count }]`
+- `GET /reports/officernd/win-loss?month=YYYY-MM` → per-staff win/loss for OfficeRnD-linked deals only
+
+> All four `/reports/officernd/*` endpoints filter the month window on `officernd_sync.created_at`, not on deal date.
 
 ### OfficeRnD (admin only)
 - `GET /officernd/sync` (paginated triage list)
@@ -278,3 +293,11 @@ docker-compose down         # Stop all services
 34. **Calendar event timezone**: All TidyCal bookings use `timeZone: "Asia/Qatar"` (UTC+3, no DST). Meeting time slots are 08:30–17:00 Sunday–Thursday.
 35. **markAsLost sets stage**: The `markAsLost` service method sets both `status = "lost"` AND `stage = "LOST"` (plus appends to `stageHistory`). Without the stage update, lost deals won't appear in the pipeline Lost column.
 36. **Pipeline data fetching**: The pipeline board fetches deals with all three statuses (`active`, `won`, `lost`) via `Promise.all` and buckets them client-side into 8 columns. Won/Lost deals are NOT filtered out.
+37. **Deploy script invariants** (`Deploy-to-VPS.ps1`):
+    - **CRLF**: `Invoke-VpsScript` normalizes heredoc content to LF before writing the temp `.sh` file. Don't reintroduce raw `[System.IO.File]::WriteAllText($tempFile, $Script, ...)` — bash on the VPS chokes on `\r\n` (`set: -`, `$'\r': command not found`).
+    - **Native command stderr**: `Invoke-VpsCommand` dispatches via `cmd /c "ssh ... 2>&1"` so stderr is merged at the OS level. PowerShell 5.1 will otherwise wrap each stderr line as a `RemoteException` `NativeCommandError` and crash the deploy at the call site — even on harmless lines like `nginx [warn]`.
+    - **Migrations**: Run via `node backend/scripts/run-migrations-prod.js` (not the TypeORM CLI — see also note 23 below). The runner uses TypeORM's DataSource API against compiled migrations in `dist/src/db/migrations/*.js`. `Update-Backend` calls it between `pnpm build` and `pm2 restart`.
+    - **No em-dashes or other non-ASCII** in the script body. The file is UTF-8 without BOM; PowerShell 5.1 reads it as Windows-1252 and trips on multi-byte sequences mid-string, breaking heredoc parsing for the rest of the file. Use plain hyphens in log messages.
+    - **Sentinel-based success**: every remote step echoes a sentinel (`UPDATE_COMPLETE`, `NGINX_CONFIGURED`, `PM2_STARTED`, etc.). Functions return `$false` if the sentinel is missing and dump the remote output to logs. The main flow ANDs all step results into `$results.Backend` so the summary reflects reality.
+    - **Health check**: `Test-BackendHealth` uses `GET /api/v1/auth/me` and accepts `{200, 401}`. Don't switch to `/auth/login` — it's POST-only and always 404s.
+38. **Production migration drift** (one-time, recorded): three migrations (`1750000000000-CreateMissingTables`, `1778100000000-AddMemberFieldsToOfficerndSync`, `1778200000000-AddPasswordResetToUsers`) had their schema effects applied via the `synchronize: true` bootstrap toggle in `Setup-BackendEnvironment` but were never recorded in the production `migrations` table. They have been back-recorded so future `runMigrations()` calls skip them. If you ever re-init the production DB from scratch, run all migrations the proper way and skip the synchronize-toggle hack.
