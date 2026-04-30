@@ -21,13 +21,13 @@ export default function OverallSummarySection() {
   const { ref, exportPdf } = useExportPdf("Overall-Summary-Report");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["reports", "staff-performance", month],
-    queryFn: () => reportsApi.getStaffPerformance(month || undefined),
+    queryKey: ["reports", "staff-performance", month, "leads"],
+    queryFn: () => reportsApi.getStaffPerformance(month || undefined, "leads"),
   });
 
   return (
     <Card
-      title="Overall Summary Report"
+      title="Overall Summary Report (Lead Sources)"
       description="Staff performance with deal amounts"
       action={
         <div className="flex items-center gap-2">
