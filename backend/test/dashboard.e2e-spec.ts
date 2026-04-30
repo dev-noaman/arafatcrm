@@ -91,7 +91,7 @@ describe("Dashboard OfficeRnD exclusion", () => {
     });
     await dealRepo.save(organicDeal);
 
-    // Seed: OfficeRnD deal (has officerndSyncId)
+    // Seed: OfficeRnD deal (has officerndSyncId, marked as won to detect bug)
     const officerndDeal = dealRepo.create({
       title: "Dashboard Test OfficeRnD Deal",
       value: 60000,
@@ -101,8 +101,8 @@ describe("Dashboard OfficeRnD exclusion", () => {
       clientId: savedOfficerndClient.id,
       ownerId: savedAdmin.id,
       officerndSyncId: syncId,
-      status: "active",
-      stage: "NEW",
+      status: "won",
+      stage: "WON",
     });
     await dealRepo.save(officerndDeal);
   });
@@ -141,9 +141,12 @@ describe("Dashboard OfficeRnD exclusion", () => {
       .get("/api/v1/dashboard/by-location")
       .set("Authorization", `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    // Only the organic deal contributes; OfficeRnD deal filtered out
-    const totalRows = res.body.length;
-    expect(totalRows).toBeGreaterThanOrEqual(1);
-    // No assertions on individual won/lost — both deals are active
+    // Only the organic deal contributes; OfficeRnD deal (which is won) must be filtered out
+    // If OfficeRnD deal were included, one location would have won=1
+    // Since OfficeRnD deal is filtered, no location should have won > 0
+    for (const row of res.body) {
+      expect(row.won).toBe(0);
+      expect(row.lost).toBe(0);
+    }
   });
 });

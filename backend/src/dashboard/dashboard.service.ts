@@ -104,7 +104,7 @@ export class DashboardService {
       .addSelect("COUNT(deal.id)", "count")
       .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
       .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
-      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
+      .where("(deal.isLost = :isLost OR deal.status != :activeStatus)", { isLost: false, activeStatus: "active" })
       .andWhere("deal.officernd_sync_id IS NULL");
 
     if (userRole === "SALES" && userId) {
