@@ -13,7 +13,6 @@ import {
   AlertCircle,
   CheckCircle,
   Unlink,
-  Copy,
 } from "lucide-react";
 
 export default function ProfilePage() {

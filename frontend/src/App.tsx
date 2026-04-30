@@ -11,7 +11,7 @@ import ReportsPage from "@/pages/reports/ReportsPage";
 import UsersPage from "@/pages/users/UsersPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import RequireRole from "@/components/RequireRole";
-import OfficerndPage from "@/pages/officernd/OfficeRnDPage";
+import OfficerndPage from "@/pages/officernd/OfficerndPage";
 
 console.log("[App.tsx] Rendering App component");
 

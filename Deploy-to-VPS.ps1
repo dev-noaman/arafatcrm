@@ -315,7 +315,17 @@ function Build-Frontend {
         $env:VITE_API_URL = "/api/v1"
 
         Write-Log "Building frontend (Vite)..." -Color $Colors.Info
-        & pnpm --filter frontend build | Out-Null
+        # Stream build output to the host so tsc/vite errors are visible. Capture exit
+        # code immediately — Test-Path on dist/ is NOT a build-success signal: an old
+        # dist/ from a prior successful build will pass that check while shipping stale
+        # bytes, which is exactly how this script silently re-deployed an Apr 29 bundle
+        # for a whole day. Any non-zero exit means the build failed and we must abort.
+        & pnpm --filter frontend build
+        $buildExit = $LASTEXITCODE
+        if ($buildExit -ne 0) {
+            Write-Log "Frontend build failed (exit code $buildExit). Refusing to deploy stale dist/." -Color $Colors.Error
+            return $false
+        }
 
         $distPath = Join-Path $ScriptPath "frontend/dist"
         if (-not (Test-Path $distPath)) {
