@@ -13,16 +13,21 @@ export class DashboardService {
   async getStats(userId?: string, userRole?: string): Promise<DashboardStatsDto> {
     const isSales = userRole === "SALES" && userId;
 
-    const totalDeals = isSales
-      ? await this.dealsRepo.count({ where: { owner: { id: userId } } })
-      : await this.dealsRepo.count();
+    const totalDealsQb = this.dealsRepo
+      .createQueryBuilder("deal")
+      .where("deal.officernd_sync_id IS NULL");
+    if (isSales) {
+      totalDealsQb.andWhere("deal.owner_id = :uid", { uid: userId });
+    }
+    const totalDeals = await totalDealsQb.getCount();
 
     const wonQb = this.dealsRepo
       .createQueryBuilder("deal")
       .where('deal.status = :status OR deal.stage = :stage', {
         status: "won",
         stage: "WON",
-      });
+      })
+      .andWhere("deal.officernd_sync_id IS NULL");
     if (isSales) {
       wonQb.andWhere("deal.owner_id = :uid", { uid: userId });
     }
@@ -33,7 +38,8 @@ export class DashboardService {
       .where('deal.status = :status OR deal.stage = :stage', {
         status: "lost",
         stage: "LOST",
-      });
+      })
+      .andWhere("deal.officernd_sync_id IS NULL");
     if (isSales) {
       lostQb.andWhere("deal.owner_id = :uid", { uid: userId });
     }
@@ -98,7 +104,8 @@ export class DashboardService {
       .addSelect("COUNT(deal.id)", "count")
       .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
       .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
-      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" });
+      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" })
+      .andWhere("deal.officernd_sync_id IS NULL");
 
     if (userRole === "SALES" && userId) {
       qb.andWhere("deal.owner_id = :uid", { uid: userId });
@@ -121,7 +128,8 @@ export class DashboardService {
       .addSelect("COUNT(deal.id)", "count")
       .addSelect("SUM(CASE WHEN deal.status = 'won' OR deal.stage = 'WON' THEN 1 ELSE 0 END)", "wonCount")
       .addSelect("SUM(CASE WHEN deal.status = 'lost' OR deal.stage = 'LOST' THEN 1 ELSE 0 END)", "lostCount")
-      .where("deal.isLost = :isLost OR deal.status != :activeStatus", { isLost: false, activeStatus: "active" });
+      .where("(deal.isLost = :isLost OR deal.status != :activeStatus)", { isLost: false, activeStatus: "active" })
+      .andWhere("client.source != :officerndSource", { officerndSource: "OFFICERND_RENEWAL" });
 
     if (userRole === "SALES" && userId) {
       qb.andWhere("deal.owner_id = :uid", { uid: userId });
