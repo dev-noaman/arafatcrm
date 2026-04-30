@@ -13,8 +13,11 @@ export class ReportsController {
 
   @Get("win-loss")
   @ApiOperation({ summary: "Get win/loss report by user" })
-  getWinLossReport(@User() user: any) {
-    return this.reportsService.getWinLossReport(user.id, user.role);
+  getWinLossReport(
+    @Query("source") source: "leads" | "officernd" | "all" = "all",
+    @User() user: any,
+  ) {
+    return this.reportsService.getWinLossReport(user.id, user.role, source);
   }
 
   @Get("pipeline")
@@ -38,7 +41,10 @@ export class ReportsController {
   @Get("staff-performance")
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "Get monthly staff performance report (admin only)" })
-  getStaffPerformance(@Query("month") month?: string) {
-    return this.reportsService.getStaffPerformance(month);
+  getStaffPerformance(
+    @Query("month") month?: string,
+    @Query("source") source: "leads" | "officernd" | "all" = "all",
+  ) {
+    return this.reportsService.getStaffPerformance(month, source);
   }
 }
