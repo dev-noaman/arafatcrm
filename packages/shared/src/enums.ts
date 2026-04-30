@@ -94,3 +94,13 @@ export const OfficerndSyncStatus = {
   IGNORED: "IGNORED",
 } as const;
 export type OfficerndSyncStatus = (typeof OfficerndSyncStatus)[keyof typeof OfficerndSyncStatus];
+
+export const OfficerndMembershipType = {
+  OFFICE: "OFFICE",
+  VIRTUAL_OFFICE: "VIRTUAL_OFFICE",
+  TRADE_LICENSE: "TRADE_LICENSE",
+  COWORKING: "COWORKING",
+  OTHERS: "OTHERS",
+} as const;
+export type OfficerndMembershipType =
+  (typeof OfficerndMembershipType)[keyof typeof OfficerndMembershipType];
