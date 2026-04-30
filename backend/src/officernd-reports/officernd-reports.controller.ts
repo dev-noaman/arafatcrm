@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { Roles } from "../common/decorators/roles.decorator";
 import { Role } from "@arafat/shared";
@@ -33,5 +33,11 @@ export class OfficerndReportsController {
   @ApiOperation({ summary: "Won/lost/active counts and win rate for OfficeRnD deals" })
   getDashboardWinLoss() {
     return this.service.getDashboardWinLoss();
+  }
+
+  @Get("reports/officernd/staff-summary")
+  @ApiOperation({ summary: "Per-staff OfficeRnD breakdown (filterable by month on sync.created_at)" })
+  getReportStaffSummary(@Query("month") month?: string) {
+    return this.service.getReportStaffSummary(month);
   }
 }

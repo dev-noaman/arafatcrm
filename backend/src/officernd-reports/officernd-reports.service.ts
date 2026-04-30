@@ -56,6 +56,45 @@ export class OfficerndReportsService {
     return rows.map((r) => ({ userId: r.userId, userName: r.userName ?? r.userEmail, count: parseInt(r.count, 10) }));
   }
 
+  async getReportStaffSummary(month?: string) {
+    const qb = this.syncRepo
+      .createQueryBuilder("s")
+      .leftJoin("s.assignedUser", "u")
+      .leftJoin("s.deal", "d")
+      .where("s.assigned_to IS NOT NULL");
+
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 1);
+      qb.andWhere("s.created_at >= :start AND s.created_at < :end", { start, end });
+    }
+
+    const rows = await qb
+      .select("u.id", "userId")
+      .addSelect("u.name", "userName")
+      .addSelect("u.email", "userEmail")
+      .addSelect(`SUM(CASE WHEN s.status IN ('ASSIGNED','PIPELINED') THEN 1 ELSE 0 END)`, "assigned")
+      .addSelect(`SUM(CASE WHEN s.status = 'PIPELINED' THEN 1 ELSE 0 END)`, "pipelined")
+      .addSelect(`SUM(CASE WHEN d.status = 'won' OR d.stage = 'WON' THEN 1 ELSE 0 END)`, "won")
+      .addSelect(`SUM(CASE WHEN d.status = 'lost' OR d.stage = 'LOST' THEN 1 ELSE 0 END)`, "lost")
+      .groupBy("u.id").addGroupBy("u.name").addGroupBy("u.email")
+      .getRawMany();
+
+    return rows.map((r) => {
+      const won = parseInt(r.won, 10) || 0;
+      const lost = parseInt(r.lost, 10) || 0;
+      return {
+        userId: r.userId,
+        userName: r.userName ?? r.userEmail,
+        assigned: parseInt(r.assigned, 10) || 0,
+        pipelined: parseInt(r.pipelined, 10) || 0,
+        won, lost,
+        winRate: won + lost > 0 ? Math.round((won / (won + lost)) * 1000) / 10 : 0,
+      };
+    });
+  }
+
   async getDashboardWinLoss() {
     const rows = await this.dealsRepo
       .createQueryBuilder("d")

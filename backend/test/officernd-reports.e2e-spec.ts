@@ -409,6 +409,35 @@ describe("OfficerndReports endpoints", () => {
     });
   });
 
+  describe("GET /reports/officernd/staff-summary", () => {
+    it("returns per-staff assigned/pipelined/won/lost/winRate", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/reports/officernd/staff-summary")
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      // Find sales1 row by the unique-per-test-run username pattern
+      const sales1 = res.body.find((r: any) => r.userName.includes("sales1"));
+      expect(sales1).toBeDefined();
+      expect(sales1.assigned).toBe(3);   // 1 ASSIGNED + 2 PIPELINED rows owned by sales1
+      expect(sales1.pipelined).toBe(2);  // 2 PIPELINED rows
+      expect(sales1.won).toBe(1);
+      expect(sales1.lost).toBe(1);
+      expect(sales1.winRate).toBe(50);
+    });
+    it("?month=YYYY-MM excludes rows outside the window", async () => {
+      const oldMonth = "2024-01"; // before any seeded data
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/reports/officernd/staff-summary?month=${oldMonth}`)
+        .set("Authorization", `Bearer ${adminToken}`);
+      expect(res.status).toBe(200);
+      // None of the seeded sales1/sales2 rows should appear in 2024-01
+      const sales1 = res.body.find((r: any) => r.userName.includes("sales1"));
+      const sales2 = res.body.find((r: any) => r.userName.includes("sales2"));
+      expect(sales1).toBeUndefined();
+      expect(sales2).toBeUndefined();
+    });
+  });
+
   describe("GET /dashboard/officernd/by-type", () => {
     it("returns counts grouped by class, excluding IGNORED", async () => {
       const res = await request(app.getHttpServer())
