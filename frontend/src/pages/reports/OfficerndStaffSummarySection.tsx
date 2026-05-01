@@ -20,11 +20,11 @@ export default function OfficerndStaffSummarySection() {
       description="Assigned, pipelined, won, and lost counts for OfficeRnD renewals"
       action={
         <div className="flex items-center gap-2">
-          <select value={month} onChange={(e) => setMonth(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
+          <select value={month} onChange={(e) => setMonth(e.target.value)} className="min-h-[44px] cursor-pointer rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
             {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
-          <button onClick={exportPdf} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-            <FileDown className="h-3.5 w-3.5" /> PDF
+          <button type="button" onClick={exportPdf} className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <FileDown aria-hidden="true" className="h-3.5 w-3.5" /> PDF
           </button>
         </div>
       }
@@ -49,7 +49,7 @@ export default function OfficerndStaffSummarySection() {
                   <tr key={row.userId}>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-purple-600" />
+                        <Users aria-hidden="true" className="h-4 w-4 text-purple-600" />
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{row.userName}</span>
                       </div>
                     </td>

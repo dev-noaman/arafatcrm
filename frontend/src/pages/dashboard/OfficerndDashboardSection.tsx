@@ -51,7 +51,7 @@ export default function OfficerndDashboardSection() {
           <Card key={c.title} className="p-5">
             <div className="flex items-center gap-4">
               <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
-                <c.icon className={`h-6 w-6 ${c.color}`} />
+                <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">{c.title}</p>
@@ -67,7 +67,7 @@ export default function OfficerndDashboardSection() {
           <Card key={c.title} className="p-5">
             <div className="flex items-center gap-4">
               <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
-                <c.icon className={`h-6 w-6 ${c.color}`} />
+                <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">{c.title}</p>

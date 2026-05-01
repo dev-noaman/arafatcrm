@@ -13,6 +13,7 @@ interface ApexChartProps {
 
 export default function ApexChart({ options, series, type, height = 350 }: ApexChartProps) {
   const [isDark, setIsDark] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
     const el = document.documentElement;
@@ -25,16 +26,31 @@ export default function ApexChart({ options, series, type, height = 350 }: ApexC
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Spread caller options FIRST, then explicitly override merged keys. The previous
+  // order (`{ chart: {...defaults, ...options.chart}, ...options }`) silently undid the
+  // chart merge because the trailing `...options` would replace `chart` wholesale.
+  const { chart: userChart, ...restOptions } = options;
   const mergedOptions: ApexOptions = {
+    ...restOptions,
     chart: {
       fontFamily: "Outfit, sans-serif",
       toolbar: { show: false },
       background: "transparent",
-      ...options.chart,
+      // Honour OS-level reduced-motion preference. Disables ApexCharts' default
+      // entry animations for users who opt out of motion.
+      animations: { enabled: !reduceMotion },
+      ...userChart,
     },
     colors: options.colors ?? BRAND_COLORS,
     theme: { mode: isDark ? "dark" : "light" },
-    ...options,
   };
 
   return (
