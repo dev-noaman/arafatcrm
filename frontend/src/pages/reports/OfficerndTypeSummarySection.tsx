@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { officerndReportsApi } from "@/api/officernd-reports";
-import { Card } from "@/components/ui";
-import { FileDown } from "lucide-react";
+import { Card, SkeletonChart } from "@/components/ui";
+import { FileDown, AlertTriangle } from "lucide-react";
 import { useExportPdf } from "@/hooks/use-export-pdf";
 import { MONTHS } from "./months";
 import { MembershipTypeChart } from "@/components/charts";
@@ -10,7 +10,7 @@ import { MembershipTypeChart } from "@/components/charts";
 export default function OfficerndTypeSummarySection() {
   const [month, setMonth] = useState("");
   const { ref, exportPdf } = useExportPdf("OfficeRnD-Type-Summary");
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["reports", "officernd", "type-summary", month],
     queryFn: () => officerndReportsApi.getReportTypeSummary(month || undefined),
   });
@@ -31,8 +31,14 @@ export default function OfficerndTypeSummarySection() {
       }
     >
       <div ref={ref}>
-        {isLoading
-          ? <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
+        {isLoading ? <SkeletonChart />
+          : error ? (
+            <div role="alert" className="flex h-[350px] flex-col items-center justify-center gap-3 text-sm text-gray-600">
+              <AlertTriangle aria-hidden="true" className="h-8 w-8 text-red-500" />
+              <p>Couldn't load membership-type breakdown.</p>
+              <button type="button" onClick={() => refetch()} className="min-h-[44px] cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500">Try again</button>
+            </div>
+          )
           : <MembershipTypeChart data={data ?? []} />
         }
       </div>

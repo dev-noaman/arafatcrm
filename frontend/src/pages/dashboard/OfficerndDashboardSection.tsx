@@ -1,11 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { officerndReportsApi } from "@/api/officernd-reports";
-import { Card } from "@/components/ui";
+import { Card, SkeletonStatCard, SkeletonChart } from "@/components/ui";
 import {
   MembershipTypeChart,
   OfficerndAssignedByStaffChart,
 } from "@/components/charts";
-import { Building2, UserCheck, ArrowRight, EyeOff, Trophy, X, Activity } from "lucide-react";
+import { Building2, UserCheck, ArrowRight, EyeOff, Trophy, X, Activity, AlertTriangle } from "lucide-react";
+
+function ErrorState({ onRetry, message }: { onRetry: () => void; message: string }) {
+  return (
+    <div role="alert" className="flex h-[350px] flex-col items-center justify-center gap-3 text-sm text-gray-600">
+      <AlertTriangle aria-hidden="true" className="h-8 w-8 text-red-500" />
+      <p>{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="min-h-[44px] cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
 
 export default function OfficerndDashboardSection() {
   const lifecycle = useQuery({
@@ -47,49 +63,65 @@ export default function OfficerndDashboardSection() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {lifecycleCards.map((c) => (
-          <Card key={c.title} className="p-5">
-            <div className="flex items-center gap-4">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
-                <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
+        {lifecycle.isLoading
+          ? Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+          : lifecycle.error
+          ? (
+            <Card className="col-span-2 md:col-span-4 p-5">
+              <ErrorState onRetry={() => lifecycle.refetch()} message="Couldn't load lifecycle counts." />
+            </Card>
+          )
+          : lifecycleCards.map((c) => (
+            <Card key={c.title} className="p-5">
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
+                  <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{c.title}</p>
+                  <p className="text-xl font-bold text-gray-900">{c.value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">{c.title}</p>
-                <p className="text-xl font-bold text-gray-900">{lifecycle.isLoading ? "-" : c.value}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))
+        }
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {wlCards.map((c) => (
-          <Card key={c.title} className="p-5">
-            <div className="flex items-center gap-4">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
-                <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
+        {winLoss.isLoading
+          ? Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+          : winLoss.error
+          ? (
+            <Card className="col-span-2 md:col-span-4 p-5">
+              <ErrorState onRetry={() => winLoss.refetch()} message="Couldn't load win/loss summary." />
+            </Card>
+          )
+          : wlCards.map((c) => (
+            <Card key={c.title} className="p-5">
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.bg}`}>
+                  <c.icon aria-hidden="true" className={`h-6 w-6 ${c.color}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{c.title}</p>
+                  <p className="text-xl font-bold text-gray-900">{c.value}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">{c.title}</p>
-                <p className="text-xl font-bold text-gray-900">{winLoss.isLoading ? "-" : c.value}</p>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))
+        }
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="Membership Type Breakdown">
-          {byType.isLoading
-            ? <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-            : <MembershipTypeChart data={byType.data ?? []} />
-          }
+          {byType.isLoading ? <SkeletonChart />
+            : byType.error ? <ErrorState onRetry={() => byType.refetch()} message="Couldn't load membership types." />
+            : <MembershipTypeChart data={byType.data ?? []} />}
         </Card>
         <Card title="Assigned Per Staff">
-          {assigned.isLoading
-            ? <div className="flex items-center justify-center h-[350px] text-gray-500">Loading...</div>
-            : <OfficerndAssignedByStaffChart data={assigned.data ?? []} />
-          }
+          {assigned.isLoading ? <SkeletonChart />
+            : assigned.error ? <ErrorState onRetry={() => assigned.refetch()} message="Couldn't load assignments." />
+            : <OfficerndAssignedByStaffChart data={assigned.data ?? []} />}
         </Card>
       </div>
     </div>
