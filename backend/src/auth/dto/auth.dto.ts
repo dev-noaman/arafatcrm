@@ -54,3 +54,23 @@ export class UpdateProfileDto {
   @MinLength(6)
   newPassword?: string;
 }
+
+export class ForgotPasswordDto {
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(4)
+  @IsNotEmpty()
+  password!: string;
+}

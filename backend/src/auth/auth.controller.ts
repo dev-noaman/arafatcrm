@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
-import { LoginDto, RegisterDto, UpdateProfileDto } from "./dto/auth.dto";
+import { LoginDto, RegisterDto, UpdateProfileDto, ForgotPasswordDto, ResetPasswordDto } from "./dto/auth.dto";
 import { Public } from "../common/decorators";
 import { User as UserDecorator } from "../common/decorators";
 
@@ -56,5 +56,21 @@ export class AuthController {
   @ApiOperation({ summary: "Refresh access token (placeholder)" })
   async refreshToken() {
     return { message: "Refresh token endpoint" };
+  }
+
+  @Public()
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Request password reset email" })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Reset password with token" })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
   }
 }

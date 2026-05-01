@@ -62,9 +62,14 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <a href="/auth/forgot-password" className="text-sm font-medium text-brand-600 hover:text-brand-700">
+                Forgot password?
+              </a>
+            </div>
             <input
               id="password"
               type="password"
@@ -90,18 +95,11 @@ export default function LoginPage() {
           <p className="mb-3 text-center text-xs font-medium uppercase tracking-wide text-gray-400">Quick Demo Login</p>
           <div className="flex gap-3">
             <button
-              onClick={() => quickLogin("admin@arafatcrm.com", "password123")}
+              onClick={() => quickLogin("adel.noaman@arafatgroup.com", "2203")}
               disabled={isLoading}
               className="flex-1 rounded-lg border-2 border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50"
             >
               Admin
-            </button>
-            <button
-              onClick={() => quickLogin("sales1@arafatcrm.com", "password123")}
-              disabled={isLoading}
-              className="flex-1 rounded-lg border-2 border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50"
-            >
-              Sales
             </button>
           </div>
         </div>

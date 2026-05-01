@@ -19,4 +19,10 @@ export class User extends BaseEntity {
 
   @Column({ default: true })
   isActive: boolean = true;
+
+  @Column({ name: "password_reset_token", type: "varchar", nullable: true })
+  passwordResetToken: string | null = null;
+
+  @Column({ name: "password_reset_expires", type: "timestamptz", nullable: true })
+  passwordResetExpires: Date | null = null;
 }
